@@ -34,7 +34,11 @@ function inboxContext(emails: ParsedEmail[]): ContextBlock[] {
  * Gemini, and stream logs + context + the final result over `send`. Any failure
  * is streamed as an error log followed by `done` — never thrown to the caller.
  */
-export async function runEmailAgent(send: Send, userId: string): Promise<void> {
+export async function runEmailAgent(
+  send: Send,
+  userId: string,
+  apiKey: string,
+): Promise<void> {
   try {
     send(logEvent('info', 'system', 'Authenticating with Google Workspace...'));
 
@@ -59,7 +63,7 @@ export async function runEmailAgent(send: Send, userId: string): Promise<void> {
       return;
     }
 
-    const result = await categorizeInbox(emails);
+    const result = await categorizeInbox(emails, apiKey);
 
     const geminiBlock: ContextBlock = {
       id: 'ctx-gemini',

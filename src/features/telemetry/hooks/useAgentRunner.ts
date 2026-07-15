@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
+import { selectAiProviderKey } from '../../settings/settingsSlice';
 import { selectSelectedSkill } from '../../skills/skillsSlice';
 import {
   contextUpdated,
@@ -23,83 +25,104 @@ export interface UseAgentRunner {
 }
 
 /**
- * Drives an agent run by consuming the server's Server-Sent Events stream and
- * dispatching each frame into the telemetry slice. The transport is HTTP/SSE;
- * the Redux surface is unchanged from the previous mock implementation.
+ * Drives an agent run by POSTing to the server's SSE endpoint (via
+ * fetch-event-source, so we can send the BYOK key as a header) and dispatching
+ * each frame into the telemetry slice. Redux surface is unchanged.
  */
 export function useAgentRunner(): UseAgentRunner {
   const dispatch = useAppDispatch();
   const skill = useAppSelector(selectSelectedSkill);
+  const apiKey = useAppSelector(selectAiProviderKey);
   const [isRunning, setIsRunning] = useState(false);
-  const sourceRef = useRef<EventSource | null>(null);
+  const controllerRef = useRef<AbortController | null>(null);
   const completedRef = useRef(false);
 
   const finish = useCallback(() => {
+    if (completedRef.current) return;
     completedRef.current = true;
-    sourceRef.current?.close();
-    sourceRef.current = null;
+    controllerRef.current?.abort();
+    controllerRef.current = null;
     dispatch(streamingSet(false));
     setIsRunning(false);
   }, [dispatch]);
 
-  // Close any open stream if the component unmounts mid-run.
+  // Abort any in-flight stream on unmount without emitting a stray error.
   useEffect(() => {
     return () => {
-      sourceRef.current?.close();
-      sourceRef.current = null;
+      completedRef.current = true;
+      controllerRef.current?.abort();
+      controllerRef.current = null;
     };
   }, []);
 
   const run = useCallback(() => {
     if (isRunning || !skill) return;
 
-    dispatch(resultCleared()); // wipe any previous run's result
+    dispatch(resultCleared());
     dispatch(streamingSet(true));
     setIsRunning(true);
     completedRef.current = false;
 
-    const url = `${AGENT_RUN_URL}?skill=${encodeURIComponent(skill.name)}`;
-    const source = new EventSource(url);
-    sourceRef.current = source;
+    const controller = new AbortController();
+    controllerRef.current = controller;
 
-    source.onmessage = (message: MessageEvent) => {
-      let event: AgentStreamEvent;
-      try {
-        event = JSON.parse(message.data as string) as AgentStreamEvent;
-      } catch {
-        return; // ignore a malformed frame rather than tear down the run
-      }
-
-      switch (event.type) {
-        case 'log':
-          dispatch(logAppended(event.entry));
-          break;
-        case 'context':
-          dispatch(contextUpdated(event.snapshot));
-          break;
-        case 'result':
-          dispatch(resultReceived(event.result));
-          break;
-        case 'done':
+    void fetchEventSource(AGENT_RUN_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        // BYOK: the user's key (may be empty — the server responds with a
+        // helpful error frame in that case).
+        'x-ai-provider-key': apiKey ?? '',
+      },
+      body: JSON.stringify({ skill: skill.name }),
+      signal: controller.signal,
+      openWhenHidden: true,
+      onmessage(message) {
+        let event: AgentStreamEvent;
+        try {
+          event = JSON.parse(message.data) as AgentStreamEvent;
+        } catch {
+          return; // ignore a malformed frame
+        }
+        switch (event.type) {
+          case 'log':
+            dispatch(logAppended(event.entry));
+            break;
+          case 'context':
+            dispatch(contextUpdated(event.snapshot));
+            break;
+          case 'result':
+            dispatch(resultReceived(event.result));
+            break;
+          case 'done':
+            finish();
+            break;
+        }
+      },
+      onclose() {
+        // One-shot stream: a close means we're finished — don't auto-reconnect.
+        finish();
+        throw new Error('stream complete');
+      },
+      onerror(err) {
+        if (!completedRef.current) {
+          dispatch(
+            logAppended({
+              id: crypto.randomUUID(),
+              timestamp: Date.now(),
+              level: 'error',
+              type: 'system',
+              message: 'Agent stream disconnected — is the server running on :3001?',
+            }),
+          );
           finish();
-          break;
-      }
-    };
-
-    source.onerror = () => {
-      if (completedRef.current) return; // normal completion already closed the stream
-      dispatch(
-        logAppended({
-          id: crypto.randomUUID(),
-          timestamp: Date.now(),
-          level: 'error',
-          type: 'system',
-          message: 'Agent stream disconnected — is the server running on :3001?',
-        }),
-      );
-      finish();
-    };
-  }, [dispatch, finish, isRunning, skill]);
+        }
+        throw err; // never auto-retry a one-shot run
+      },
+    }).catch(() => {
+      // Terminal errors are surfaced via onerror/onclose; swallow the rejection.
+    });
+  }, [apiKey, dispatch, finish, isRunning, skill]);
 
   return { isRunning, canRun: Boolean(skill) && !isRunning, run };
 }

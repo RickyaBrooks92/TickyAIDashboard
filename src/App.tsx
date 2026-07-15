@@ -1,6 +1,7 @@
 import { DashboardLayout } from './components/layout/DashboardLayout';
 import { TopBar } from './components/layout/TopBar';
 import { ConnectGoogleButton } from './features/auth';
+import { SettingsMenu } from './features/settings';
 import { ControlPlane } from './features/skills';
 import { StreamStatus, TelemetryPanel } from './features/telemetry';
 
@@ -16,6 +17,7 @@ export default function App() {
         <TopBar
           actions={
             <>
+              <SettingsMenu />
               <ConnectGoogleButton />
               <StreamStatus />
             </>

@@ -1,9 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit';
+import settingsReducer from '../features/settings/settingsSlice';
 import skillsReducer from '../features/skills/skillsSlice';
 import telemetryReducer from '../features/telemetry/telemetrySlice';
 
 export const store = configureStore({
   reducer: {
+    settings: settingsReducer,
     skills: skillsReducer,
     telemetry: telemetryReducer,
   },

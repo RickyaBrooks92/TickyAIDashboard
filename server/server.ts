@@ -2,8 +2,7 @@ import cors from 'cors';
 import 'dotenv/config';
 import express from 'express';
 import { runEmailAgent } from './agentRunner.ts';
-import type { AgentStreamEvent } from './agentStream.ts';
-import { isGeminiConfigured } from './ai.ts';
+import { logEvent, type AgentStreamEvent } from './agentStream.ts';
 import { authRouter, isGoogleConfigured } from './auth.ts';
 import { trashMessages } from './gmail.ts';
 
@@ -19,14 +18,15 @@ app.use(express.json());
 app.use('/api/auth', authRouter);
 
 app.get('/', (_req, res) => {
-  res.type('text/plain').send('Tickys agent server — SSE stream at GET /api/agent/run');
+  res.type('text/plain').send('Tickys agent server — SSE stream at POST /api/agent/run');
 });
 
 /**
- * Server-Sent Events endpoint. Runs the real email agent (Gmail → Gemini) and
- * streams each frame as `data: {json}\n\n`, then closes the connection.
+ * Server-Sent Events endpoint (POST so the browser can send the BYOK key as a
+ * header). Runs the real email agent and streams each frame as `data: {json}\n\n`.
+ * The AI key arrives per request via `x-ai-provider-key` and is never logged.
  */
-app.get('/api/agent/run', async (req, res) => {
+app.post('/api/agent/run', async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
@@ -42,7 +42,22 @@ app.get('/api/agent/run', async (req, res) => {
     res.write(`data: ${JSON.stringify(event)}\n\n`);
   };
 
-  await runEmailAgent(send, 'user_1');
+  const headerKey = req.headers['x-ai-provider-key'];
+  const apiKey = typeof headerKey === 'string' ? headerKey.trim() : '';
+  if (!apiKey) {
+    send(
+      logEvent(
+        'error',
+        'system',
+        'No AI provider key — add your Gemini API key in Settings (the gear icon).',
+      ),
+    );
+    send({ type: 'done' });
+    res.end();
+    return;
+  }
+
+  await runEmailAgent(send, 'user_1', apiKey);
 
   if (!res.writableEnded) res.end();
 });
@@ -80,9 +95,5 @@ app.listen(PORT, () => {
       isGoogleConfigured() ? 'configured' : 'NOT configured (set GOOGLE_* in server/.env)'
     }`,
   );
-  console.log(
-    `[tickys-agent-server] Gemini: ${
-      isGeminiConfigured() ? 'configured' : 'NOT configured (set GEMINI_API_KEY in server/.env)'
-    }`,
-  );
+  console.log('[tickys-agent-server] AI key: per-request (BYOK via x-ai-provider-key header)');
 });

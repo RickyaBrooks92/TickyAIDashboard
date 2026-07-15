@@ -2,20 +2,6 @@ import { GoogleGenAI, Type } from '@google/genai';
 import type { EmailResultPayload, FlaggedEmail } from './agentStream.ts';
 import type { ParsedEmail } from './gmail.ts';
 
-/** True when a Gemini API key is present. */
-export function isGeminiConfigured(): boolean {
-  return Boolean(process.env.GEMINI_API_KEY);
-}
-
-// Constructed lazily so a missing key never crashes server startup.
-let client: GoogleGenAI | null = null;
-function getAI(): GoogleGenAI {
-  const apiKey = process.env.GEMINI_API_KEY;
-  if (!apiKey) throw new Error('GEMINI_API_KEY is not set in server/.env.');
-  if (!client) client = new GoogleGenAI({ apiKey });
-  return client;
-}
-
 // JSON schema that exactly matches the frontend's EmailResultPayload interface.
 const responseSchema = {
   type: Type.OBJECT,
@@ -87,9 +73,16 @@ function parseResult(text: string): EmailResultPayload {
   };
 }
 
-/** Send parsed emails to Gemini and return a structured cleanup result. */
-export async function categorizeInbox(emails: ParsedEmail[]): Promise<EmailResultPayload> {
-  const ai = getAI();
+/**
+ * Send parsed emails to Gemini using the caller-supplied API key (BYOK) and
+ * return a structured cleanup result. The client is built per call — no key is
+ * held on the server.
+ */
+export async function categorizeInbox(
+  emails: ParsedEmail[],
+  apiKey: string,
+): Promise<EmailResultPayload> {
+  const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: buildPrompt(emails),
