@@ -1,10 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { nanoid } from '@reduxjs/toolkit';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { estimateTokens } from '../../../lib/tokens';
 import { selectSelectedSkill } from '../../skills/skillsSlice';
-import type { Skill } from '../../skills/types';
-import { mockEmailResult } from '../mockData';
 import {
   contextUpdated,
   logAppended,
@@ -12,195 +8,98 @@ import {
   resultReceived,
   streamingSet,
 } from '../telemetrySlice';
-import type {
-  ContextBlock,
-  ContextWindowSnapshot,
-  ExecutionEventType,
-  LogLevel,
-} from '../types';
+import type { AgentStreamEvent } from '../types';
 
-const STEP_INTERVAL_MS = 600;
-const MAX_CONTEXT_TOKENS = 200_000;
-
-/** One simulated agent-loop step: a log line plus the full context after it runs. */
-interface AgentStep {
-  level: LogLevel;
-  type: ExecutionEventType;
-  message: string;
-  /** Cumulative context blocks present AFTER this step executes. */
-  blocks: ContextBlock[];
-}
+/** Local SSE endpoint exposed by the Node/Express agent runner (server/). */
+const AGENT_RUN_URL = 'http://localhost:3001/api/agent/run';
 
 export interface UseAgentRunner {
-  /** True while a simulated run is streaming events. */
+  /** True while a live run is streaming events. */
   isRunning: boolean;
   /** True when a skill is selected and no run is in flight. */
   canRun: boolean;
-  /** Start a simulated run for the currently selected skill. */
+  /** Start a run for the currently selected skill (opens the SSE stream). */
   run: () => void;
 }
 
-/** Build the deterministic 6-step script for a run of `skill`. */
-function buildSteps(skill: Skill): AgentStep[] {
-  const systemBlock: ContextBlock = {
-    id: 'run-system',
-    label: 'System Prompt',
-    tokenCount: 1_200,
-    content:
-      'You are the Tickys email assistant operating over the user inbox. Follow the active skill.',
-  };
-  const skillBlock: ContextBlock = {
-    id: 'run-skill',
-    label: `Skill: ${skill.name}`,
-    tokenCount: estimateTokens(skill.content),
-    content: skill.content.slice(0, 200),
-  };
-  const mailboxBlock: ContextBlock = {
-    id: 'run-mailbox',
-    label: 'Mailbox Session',
-    tokenCount: 350,
-    content: 'Connected to mailbox interface · 12 unread messages available.',
-  };
-  const payloadBlock: ContextBlock = {
-    id: 'run-payload',
-    label: 'Inbox Payload (12 headers)',
-    tokenCount: 8_400,
-    content: 'Parsed Sender / Subject / Date headers for 12 unread messages.',
-  };
-  const categorizationBlock: ContextBlock = {
-    id: 'run-categorization',
-    label: 'Categorization Working Set',
-    tokenCount: 3_200,
-    content: 'Classifying into Action Required / Information / Low-Priority · Promotional.',
-  };
-  const cleanupBlock: ContextBlock = {
-    id: 'run-cleanup',
-    label: 'Cleanup Candidates (7)',
-    tokenCount: 1_500,
-    content: '7 promotional / duplicate messages flagged for trash with rationales.',
-  };
-  const summaryBlock: ContextBlock = {
-    id: 'run-summary',
-    label: 'Summary Report',
-    tokenCount: 2_100,
-    content: '3 urgent action items · executive summary generated.',
-  };
-
-  return [
-    {
-      level: 'info',
-      type: 'system',
-      message: `Initializing agent context with skill: ${skill.name}`,
-      blocks: [systemBlock, skillBlock],
-    },
-    {
-      level: 'info',
-      type: 'tool_call',
-      message: 'Connecting to mailbox interface...',
-      blocks: [systemBlock, skillBlock, mailboxBlock],
-    },
-    {
-      level: 'info',
-      type: 'tool_result',
-      message: 'Parsing 12 unread email headers...',
-      blocks: [systemBlock, skillBlock, mailboxBlock, payloadBlock],
-    },
-    {
-      level: 'info',
-      type: 'model_response',
-      message: 'Applying categorization logic...',
-      blocks: [systemBlock, skillBlock, mailboxBlock, payloadBlock, categorizationBlock],
-    },
-    {
-      level: 'action',
-      type: 'tool_result',
-      message: 'Identified 7 promotional emails flagged for trash',
-      blocks: [
-        systemBlock,
-        skillBlock,
-        mailboxBlock,
-        payloadBlock,
-        categorizationBlock,
-        cleanupBlock,
-      ],
-    },
-    {
-      level: 'success',
-      type: 'model_response',
-      message: 'Summary report generated (3 urgent action items)',
-      blocks: [
-        systemBlock,
-        skillBlock,
-        mailboxBlock,
-        payloadBlock,
-        categorizationBlock,
-        cleanupBlock,
-        summaryBlock,
-      ],
-    },
-  ];
-}
-
-function toSnapshot(blocks: ContextBlock[]): ContextWindowSnapshot {
-  const totalTokens = blocks.reduce((sum, block) => sum + block.tokenCount, 0);
-  return {
-    blocks,
-    totalTokens,
-    maxTokens: MAX_CONTEXT_TOKENS,
-    updatedAt: Date.now(),
-  };
-}
-
 /**
- * Simulates an agent execution loop for the selected skill, streaming logs and
- * progressive context-window updates into the telemetry slice every ~600ms, then
- * emitting a structured result for the Results tab on completion.
+ * Drives an agent run by consuming the server's Server-Sent Events stream and
+ * dispatching each frame into the telemetry slice. The transport is HTTP/SSE;
+ * the Redux surface is unchanged from the previous mock implementation.
  */
 export function useAgentRunner(): UseAgentRunner {
   const dispatch = useAppDispatch();
   const skill = useAppSelector(selectSelectedSkill);
   const [isRunning, setIsRunning] = useState(false);
-  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const sourceRef = useRef<EventSource | null>(null);
+  const completedRef = useRef(false);
 
-  const clearTimers = useCallback(() => {
-    timers.current.forEach(clearTimeout);
-    timers.current = [];
+  const finish = useCallback(() => {
+    completedRef.current = true;
+    sourceRef.current?.close();
+    sourceRef.current = null;
+    dispatch(streamingSet(false));
+    setIsRunning(false);
+  }, [dispatch]);
+
+  // Close any open stream if the component unmounts mid-run.
+  useEffect(() => {
+    return () => {
+      sourceRef.current?.close();
+      sourceRef.current = null;
+    };
   }, []);
-
-  // Cancel any pending steps if the component unmounts mid-run.
-  useEffect(() => clearTimers, [clearTimers]);
 
   const run = useCallback(() => {
     if (isRunning || !skill) return;
 
-    clearTimers();
-    setIsRunning(true);
-    dispatch(streamingSet(true));
     dispatch(resultCleared()); // wipe any previous run's result
+    dispatch(streamingSet(true));
+    setIsRunning(true);
+    completedRef.current = false;
 
-    const steps = buildSteps(skill);
-    steps.forEach((step, index) => {
-      const timer = setTimeout(() => {
-        dispatch(
-          logAppended({
-            id: nanoid(),
-            timestamp: Date.now(),
-            level: step.level,
-            type: step.type,
-            message: step.message,
-          }),
-        );
-        dispatch(contextUpdated(toSnapshot(step.blocks)));
+    const url = `${AGENT_RUN_URL}?skill=${encodeURIComponent(skill.name)}`;
+    const source = new EventSource(url);
+    sourceRef.current = source;
 
-        if (index === steps.length - 1) {
-          dispatch(streamingSet(false));
-          dispatch(resultReceived(mockEmailResult));
-          setIsRunning(false);
-        }
-      }, index * STEP_INTERVAL_MS);
-      timers.current.push(timer);
-    });
-  }, [clearTimers, dispatch, isRunning, skill]);
+    source.onmessage = (message: MessageEvent) => {
+      let event: AgentStreamEvent;
+      try {
+        event = JSON.parse(message.data as string) as AgentStreamEvent;
+      } catch {
+        return; // ignore a malformed frame rather than tear down the run
+      }
+
+      switch (event.type) {
+        case 'log':
+          dispatch(logAppended(event.entry));
+          break;
+        case 'context':
+          dispatch(contextUpdated(event.snapshot));
+          break;
+        case 'result':
+          dispatch(resultReceived(event.result));
+          break;
+        case 'done':
+          finish();
+          break;
+      }
+    };
+
+    source.onerror = () => {
+      if (completedRef.current) return; // normal completion already closed the stream
+      dispatch(
+        logAppended({
+          id: crypto.randomUUID(),
+          timestamp: Date.now(),
+          level: 'error',
+          type: 'system',
+          message: 'Agent stream disconnected — is the server running on :3001?',
+        }),
+      );
+      finish();
+    };
+  }, [dispatch, finish, isRunning, skill]);
 
   return { isRunning, canRun: Boolean(skill) && !isRunning, run };
 }

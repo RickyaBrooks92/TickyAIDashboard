@@ -12,6 +12,14 @@ dist
 dist-ssr
 *.local
 
+# Env files (never commit secrets; keep the example)
+.env
+.env.*
+!.env.example
+
+# OAuth token store (contains a refresh token — never commit)
+tokens.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

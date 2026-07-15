@@ -54,6 +54,16 @@ export interface EmailResultPayload {
   flaggedForDeletion: FlaggedEmail[];
 }
 
+/**
+ * One Server-Sent Events frame from the agent runner.
+ * Mirror of the union in `server/agentStream.ts`.
+ */
+export type AgentStreamEvent =
+  | { type: 'log'; entry: ExecutionLogEntry }
+  | { type: 'context'; snapshot: ContextWindowSnapshot }
+  | { type: 'result'; result: EmailResultPayload }
+  | { type: 'done' };
+
 /** Root shape of the telemetry slice. */
 export interface TelemetryState {
   /** Append-only event stream, capped at `maxLogEntries` (ring buffer). */
