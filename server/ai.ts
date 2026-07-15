@@ -1,6 +1,5 @@
 import { GoogleGenAI, Type } from '@google/genai';
-import type { EmailResultPayload, FlaggedEmail } from './agentStream.ts';
-import type { ParsedEmail } from './gmail.ts';
+import type { EmailResultPayload, FlaggedEmail, ParsedEmail } from './agentStream.ts';
 
 // JSON schema that exactly matches the frontend's EmailResultPayload interface.
 const responseSchema = {

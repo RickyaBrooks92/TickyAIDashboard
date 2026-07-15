@@ -2,7 +2,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { useAppSelector } from '../../../app/hooks';
 import { cx } from '../../../lib/cx';
 import { AgentResultCanvas } from '../../results/components/AgentResultCanvas';
-import { selectActiveResult } from '../telemetrySlice';
+import { selectActiveResult, selectRawEmails } from '../telemetrySlice';
 import { CurrentContextWindow } from './CurrentContextWindow';
 import { ExecutionLog } from './ExecutionLog';
 
@@ -11,13 +11,16 @@ type RightPaneTab = 'telemetry' | 'results';
 /** Right pane: tabbed view over raw Telemetry and structured Results. */
 export function TelemetryPanel() {
   const activeResult = useAppSelector(selectActiveResult);
+  const rawEmails = useAppSelector(selectRawEmails);
   const [tab, setTab] = useState<RightPaneTab>('telemetry');
 
-  // Auto-switch to Results when a new result arrives. This effect only re-fires
-  // when the result reference changes, so a manual switch back to Telemetry sticks.
+  const hasResults = Boolean(rawEmails) || Boolean(activeResult);
+
+  // Auto-switch to Results as soon as the raw inbox (or a result) arrives. Only
+  // re-fires when those references change, so a manual switch back sticks.
   useEffect(() => {
-    if (activeResult) setTab('results');
-  }, [activeResult]);
+    if (rawEmails || activeResult) setTab('results');
+  }, [rawEmails, activeResult]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col bg-zinc-950">
@@ -27,7 +30,7 @@ export function TelemetryPanel() {
         </TabButton>
         <TabButton active={tab === 'results'} onClick={() => setTab('results')}>
           Results
-          {activeResult && (
+          {hasResults && (
             <span
               className="ml-1.5 h-1.5 w-1.5 rounded-full bg-emerald-400"
               aria-hidden="true"

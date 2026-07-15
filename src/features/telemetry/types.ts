@@ -54,6 +54,15 @@ export interface EmailResultPayload {
   flaggedForDeletion: FlaggedEmail[];
 }
 
+/** A raw unread email fetched from Gmail (mirror of the server's ParsedEmail). */
+export interface ParsedEmail {
+  id: string;
+  from: string;
+  subject: string;
+  date: string;
+  snippet: string;
+}
+
 /**
  * One Server-Sent Events frame from the agent runner.
  * Mirror of the union in `server/agentStream.ts`.
@@ -61,6 +70,7 @@ export interface EmailResultPayload {
 export type AgentStreamEvent =
   | { type: 'log'; entry: ExecutionLogEntry }
   | { type: 'context'; snapshot: ContextWindowSnapshot }
+  | { type: 'inbox_fetched'; payload: ParsedEmail[] }
   | { type: 'result'; result: EmailResultPayload }
   | { type: 'done' };
 
@@ -74,4 +84,6 @@ export interface TelemetryState {
   isStreaming: boolean;
   /** Latest structured agent result, rendered in the Results tab. */
   activeResult: EmailResultPayload | null;
+  /** Raw emails fetched from Gmail this run, shown before the AI result. */
+  rawEmails: ParsedEmail[] | null;
 }

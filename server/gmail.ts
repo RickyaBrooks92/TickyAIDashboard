@@ -1,15 +1,7 @@
 import { google } from 'googleapis';
+import type { ParsedEmail } from './agentStream.ts';
 import { getOAuthClient } from './auth.ts';
 import { getRefreshToken } from './tokenStore.ts';
-
-/** Minimal parsed representation of an unread email. */
-export interface ParsedEmail {
-  id: string;
-  from: string;
-  subject: string;
-  date: string;
-  snippet: string;
-}
 
 const MAX_EMAILS = 15;
 

@@ -5,7 +5,9 @@ import { selectAiProviderKey } from '../../settings/settingsSlice';
 import { selectSelectedSkill } from '../../skills/skillsSlice';
 import {
   contextUpdated,
+  inboxFetched,
   logAppended,
+  rawEmailsCleared,
   resultCleared,
   resultReceived,
   streamingSet,
@@ -59,6 +61,7 @@ export function useAgentRunner(): UseAgentRunner {
     if (isRunning || !skill) return;
 
     dispatch(resultCleared());
+    dispatch(rawEmailsCleared());
     dispatch(streamingSet(true));
     setIsRunning(true);
     completedRef.current = false;
@@ -90,6 +93,9 @@ export function useAgentRunner(): UseAgentRunner {
             break;
           case 'context':
             dispatch(contextUpdated(event.snapshot));
+            break;
+          case 'inbox_fetched':
+            dispatch(inboxFetched(event.payload));
             break;
           case 'result':
             dispatch(resultReceived(event.result));

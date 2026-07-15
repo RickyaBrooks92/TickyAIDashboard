@@ -16,11 +16,14 @@ export {
   streamingSet,
   resultReceived,
   resultCleared,
+  inboxFetched,
+  rawEmailsCleared,
   selectLog,
   selectContext,
   selectIsStreaming,
   selectContextUsageRatio,
   selectActiveResult,
+  selectRawEmails,
 } from './telemetrySlice';
 
 export type {
@@ -31,4 +34,5 @@ export type {
   ExecutionEventType,
   EmailResultPayload,
   FlaggedEmail,
+  ParsedEmail,
 } from './types';

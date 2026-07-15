@@ -4,6 +4,7 @@ import type {
   ContextWindowSnapshot,
   EmailResultPayload,
   ExecutionLogEntry,
+  ParsedEmail,
   TelemetryState,
 } from './types';
 import { mockContext, mockLog } from './mockData';
@@ -16,6 +17,7 @@ const initialState: TelemetryState = {
   context: mockContext,
   isStreaming: false,
   activeResult: null,
+  rawEmails: null,
 };
 
 /** Drop oldest entries in place so the log never exceeds its cap. */
@@ -62,6 +64,14 @@ const telemetrySlice = createSlice({
     resultCleared(state) {
       state.activeResult = null;
     },
+    /** Store the raw emails fetched from Gmail for this run. */
+    inboxFetched(state, action: PayloadAction<ParsedEmail[]>) {
+      state.rawEmails = action.payload;
+    },
+    /** Clear the raw emails (e.g. at the start of a new run). */
+    rawEmailsCleared(state) {
+      state.rawEmails = null;
+    },
   },
 });
 
@@ -74,6 +84,8 @@ export const {
   streamingSet,
   resultReceived,
   resultCleared,
+  inboxFetched,
+  rawEmailsCleared,
 } = telemetrySlice.actions;
 
 /* ---- Selectors ---- */
@@ -89,6 +101,9 @@ export const selectIsStreaming = (state: RootState): boolean =>
 
 export const selectActiveResult = (state: RootState): EmailResultPayload | null =>
   state.telemetry.activeResult;
+
+export const selectRawEmails = (state: RootState): ParsedEmail[] | null =>
+  state.telemetry.rawEmails;
 
 /** Fraction (0–1) of the context window in use. */
 export const selectContextUsageRatio = (state: RootState): number => {

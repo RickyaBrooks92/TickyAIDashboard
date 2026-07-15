@@ -50,10 +50,20 @@ export interface EmailResultPayload {
   flaggedForDeletion: FlaggedEmail[];
 }
 
+/** A raw unread email fetched from Gmail (headers + plain-text snippet). */
+export interface ParsedEmail {
+  id: string;
+  from: string;
+  subject: string;
+  date: string;
+  snippet: string;
+}
+
 /** One SSE frame. Kept identical to the frontend's `AgentStreamEvent`. */
 export type AgentStreamEvent =
   | { type: 'log'; entry: ExecutionLogEntry }
   | { type: 'context'; snapshot: ContextWindowSnapshot }
+  | { type: 'inbox_fetched'; payload: ParsedEmail[] }
   | { type: 'result'; result: EmailResultPayload }
   | { type: 'done' };
 

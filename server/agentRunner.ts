@@ -1,7 +1,7 @@
-import type { AgentStreamEvent, ContextBlock } from './agentStream.ts';
+import type { AgentStreamEvent, ContextBlock, ParsedEmail } from './agentStream.ts';
 import { estimateTokens, logEvent, snapshot } from './agentStream.ts';
 import { categorizeInbox } from './ai.ts';
-import { fetchUnreadEmails, type ParsedEmail } from './gmail.ts';
+import { fetchUnreadEmails } from './gmail.ts';
 
 type Send = (event: AgentStreamEvent) => void;
 
@@ -43,6 +43,10 @@ export async function runEmailAgent(
     send(logEvent('info', 'system', 'Authenticating with Google Workspace...'));
 
     const emails = await fetchUnreadEmails(userId);
+
+    // Surface the raw inbox to the UI immediately, before Gemini processing.
+    send({ type: 'inbox_fetched', payload: emails });
+
     const baseBlocks = inboxContext(emails);
     send({ type: 'context', snapshot: snapshot(baseBlocks) });
     send(
