@@ -2,6 +2,7 @@ import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from '../../app/store';
 import type {
   ContextWindowSnapshot,
+  EmailResultPayload,
   ExecutionLogEntry,
   TelemetryState,
 } from './types';
@@ -14,6 +15,7 @@ const initialState: TelemetryState = {
   maxLogEntries: DEFAULT_MAX_LOG_ENTRIES,
   context: mockContext,
   isStreaming: false,
+  activeResult: null,
 };
 
 /** Drop oldest entries in place so the log never exceeds its cap. */
@@ -52,6 +54,14 @@ const telemetrySlice = createSlice({
     streamingSet(state, action: PayloadAction<boolean>) {
       state.isStreaming = action.payload;
     },
+    /** Store a structured agent result (renders in the Results tab). */
+    resultReceived(state, action: PayloadAction<EmailResultPayload>) {
+      state.activeResult = action.payload;
+    },
+    /** Clear the active result (e.g. at the start of a new run). */
+    resultCleared(state) {
+      state.activeResult = null;
+    },
   },
 });
 
@@ -62,6 +72,8 @@ export const {
   contextUpdated,
   streamingToggled,
   streamingSet,
+  resultReceived,
+  resultCleared,
 } = telemetrySlice.actions;
 
 /* ---- Selectors ---- */
@@ -74,6 +86,9 @@ export const selectContext = (state: RootState): ContextWindowSnapshot | null =>
 
 export const selectIsStreaming = (state: RootState): boolean =>
   state.telemetry.isStreaming;
+
+export const selectActiveResult = (state: RootState): EmailResultPayload | null =>
+  state.telemetry.activeResult;
 
 /** Fraction (0–1) of the context window in use. */
 export const selectContextUsageRatio = (state: RootState): number => {

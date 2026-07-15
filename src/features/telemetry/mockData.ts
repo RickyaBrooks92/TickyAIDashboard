@@ -1,5 +1,6 @@
 import type {
   ContextWindowSnapshot,
+  EmailResultPayload,
   ExecutionLogEntry,
 } from './types';
 
@@ -108,3 +109,23 @@ export const mockLog: ExecutionLogEntry[] = [
     metadata: { code: 'TS2532', line: 42 },
   },
 ];
+
+/** Seed structured result emitted by the email-assistant runner on completion. */
+export const mockEmailResult: EmailResultPayload = {
+  summary:
+    '3 action items require your attention. 7 promotional emails flagged for cleanup.',
+  flaggedForDeletion: [
+    {
+      id: '1',
+      sender: 'marketing@brand.com',
+      subject: 'Huge Weekend Sale!',
+      reason: 'Promotional',
+    },
+    {
+      id: '2',
+      sender: 'alerts@software.io',
+      subject: 'Daily Digest',
+      reason: 'Low-priority automated alert',
+    },
+  ],
+};

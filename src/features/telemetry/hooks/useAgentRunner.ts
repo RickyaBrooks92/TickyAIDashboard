@@ -4,7 +4,14 @@ import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { estimateTokens } from '../../../lib/tokens';
 import { selectSelectedSkill } from '../../skills/skillsSlice';
 import type { Skill } from '../../skills/types';
-import { contextUpdated, logAppended, streamingSet } from '../telemetrySlice';
+import { mockEmailResult } from '../mockData';
+import {
+  contextUpdated,
+  logAppended,
+  resultCleared,
+  resultReceived,
+  streamingSet,
+} from '../telemetrySlice';
 import type {
   ContextBlock,
   ContextWindowSnapshot,
@@ -146,7 +153,8 @@ function toSnapshot(blocks: ContextBlock[]): ContextWindowSnapshot {
 
 /**
  * Simulates an agent execution loop for the selected skill, streaming logs and
- * progressive context-window updates into the telemetry slice every ~600ms.
+ * progressive context-window updates into the telemetry slice every ~600ms, then
+ * emitting a structured result for the Results tab on completion.
  */
 export function useAgentRunner(): UseAgentRunner {
   const dispatch = useAppDispatch();
@@ -168,6 +176,7 @@ export function useAgentRunner(): UseAgentRunner {
     clearTimers();
     setIsRunning(true);
     dispatch(streamingSet(true));
+    dispatch(resultCleared()); // wipe any previous run's result
 
     const steps = buildSteps(skill);
     steps.forEach((step, index) => {
@@ -185,6 +194,7 @@ export function useAgentRunner(): UseAgentRunner {
 
         if (index === steps.length - 1) {
           dispatch(streamingSet(false));
+          dispatch(resultReceived(mockEmailResult));
           setIsRunning(false);
         }
       }, index * STEP_INTERVAL_MS);

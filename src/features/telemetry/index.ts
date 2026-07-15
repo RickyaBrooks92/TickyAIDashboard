@@ -14,10 +14,13 @@ export {
   contextUpdated,
   streamingToggled,
   streamingSet,
+  resultReceived,
+  resultCleared,
   selectLog,
   selectContext,
   selectIsStreaming,
   selectContextUsageRatio,
+  selectActiveResult,
 } from './telemetrySlice';
 
 export type {
@@ -26,4 +29,6 @@ export type {
   ContextBlock,
   LogLevel,
   ExecutionEventType,
+  EmailResultPayload,
+  FlaggedEmail,
 } from './types';

@@ -40,6 +40,20 @@ export interface ContextWindowSnapshot {
   updatedAt: EpochMs;
 }
 
+/** One email the agent proposes to delete/archive; awaits human approval. */
+export interface FlaggedEmail {
+  id: string;
+  sender: string;
+  subject: string;
+  reason: string;
+}
+
+/** Structured JSON result emitted by the email-assistant agent. */
+export interface EmailResultPayload {
+  summary: string;
+  flaggedForDeletion: FlaggedEmail[];
+}
+
 /** Root shape of the telemetry slice. */
 export interface TelemetryState {
   /** Append-only event stream, capped at `maxLogEntries` (ring buffer). */
@@ -48,4 +62,6 @@ export interface TelemetryState {
   context: ContextWindowSnapshot | null;
   /** Whether a live feed is currently attached (future phase). */
   isStreaming: boolean;
+  /** Latest structured agent result, rendered in the Results tab. */
+  activeResult: EmailResultPayload | null;
 }
