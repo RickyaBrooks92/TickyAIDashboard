@@ -28,7 +28,7 @@ export function isGoogleConfigured(): boolean {
 }
 
 /** Build an OAuth2 client from env, or null if unconfigured (graceful local dev). */
-function getOAuthClient(): OAuth2Client | null {
+export function getOAuthClient(): OAuth2Client | null {
   if (!isGoogleConfigured()) return null;
   return new google.auth.OAuth2(
     process.env.GOOGLE_CLIENT_ID,

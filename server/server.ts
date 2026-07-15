@@ -1,17 +1,12 @@
-import { randomUUID } from 'node:crypto';
 import cors from 'cors';
 import 'dotenv/config';
 import express from 'express';
-import {
-  buildSteps,
-  emailResult,
-  snapshot,
-  type AgentStreamEvent,
-} from './agentStream.ts';
+import { runEmailAgent } from './agentRunner.ts';
+import type { AgentStreamEvent } from './agentStream.ts';
+import { isGeminiConfigured } from './ai.ts';
 import { authRouter, isGoogleConfigured } from './auth.ts';
 
 const PORT = Number(process.env.PORT) || 3001;
-const STEP_INTERVAL_MS = 600;
 
 const app = express();
 
@@ -26,54 +21,28 @@ app.get('/', (_req, res) => {
 });
 
 /**
- * Server-Sent Events endpoint. Streams a simulated agent run as one JSON
- * object per `data:` frame, then closes the connection.
+ * Server-Sent Events endpoint. Runs the real email agent (Gmail → Gemini) and
+ * streams each frame as `data: {json}\n\n`, then closes the connection.
  */
-app.get('/api/agent/run', (req, res) => {
+app.get('/api/agent/run', async (req, res) => {
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Connection', 'keep-alive');
   res.flushHeaders();
 
-  const skillName =
-    typeof req.query.skill === 'string' && req.query.skill.length > 0
-      ? req.query.skill
-      : 'email-assistant';
+  let closed = false;
+  req.on('close', () => {
+    closed = true;
+  });
 
   const send = (event: AgentStreamEvent): void => {
+    if (closed || res.writableEnded) return;
     res.write(`data: ${JSON.stringify(event)}\n\n`);
   };
 
-  const steps = buildSteps(skillName);
-  const timers: NodeJS.Timeout[] = [];
+  await runEmailAgent(send, 'user_1');
 
-  steps.forEach((step, index) => {
-    const timer = setTimeout(() => {
-      send({
-        type: 'log',
-        entry: {
-          id: randomUUID(),
-          timestamp: Date.now(),
-          level: step.level,
-          type: step.type,
-          message: step.message,
-        },
-      });
-      send({ type: 'context', snapshot: snapshot(step.blocks) });
-
-      if (index === steps.length - 1) {
-        send({ type: 'result', result: emailResult });
-        send({ type: 'done' });
-        res.end();
-      }
-    }, index * STEP_INTERVAL_MS);
-    timers.push(timer);
-  });
-
-  // Stop the run if the client disconnects early (e.g. component unmount).
-  req.on('close', () => {
-    timers.forEach(clearTimeout);
-  });
+  if (!res.writableEnded) res.end();
 });
 
 app.listen(PORT, () => {
@@ -81,6 +50,11 @@ app.listen(PORT, () => {
   console.log(
     `[tickys-agent-server] Google OAuth: ${
       isGoogleConfigured() ? 'configured' : 'NOT configured (set GOOGLE_* in server/.env)'
+    }`,
+  );
+  console.log(
+    `[tickys-agent-server] Gemini: ${
+      isGeminiConfigured() ? 'configured' : 'NOT configured (set GEMINI_API_KEY in server/.env)'
     }`,
   );
 });
