@@ -1,7 +1,25 @@
+import { useAppSelector } from '../../../app/hooks';
+import { selectIsGoogleConnected } from '../../settings/settingsSlice';
+
 /** Server endpoint that starts the Google OAuth consent flow. */
 const GOOGLE_AUTH_URL = 'http://localhost:3001/api/auth/google';
 
 export function ConnectGoogleButton() {
+  const isConnected = useAppSelector(selectIsGoogleConnected);
+
+  if (isConnected) {
+    return (
+      <button
+        type="button"
+        disabled
+        title="Google Workspace connected"
+        className="flex cursor-default items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-300"
+      >
+        ✅ Workspace Connected
+      </button>
+    );
+  }
+
   const handleConnect = () => {
     // Full-page navigation — we must leave the SPA to reach Google's consent screen.
     window.location.href = GOOGLE_AUTH_URL;

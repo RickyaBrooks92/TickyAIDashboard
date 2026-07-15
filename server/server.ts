@@ -5,6 +5,7 @@ import { runEmailAgent } from './agentRunner.ts';
 import { logEvent, type AgentStreamEvent } from './agentStream.ts';
 import { authRouter, isGoogleConfigured } from './auth.ts';
 import { trashMessages } from './gmail.ts';
+import { getRefreshToken } from './tokenStore.ts';
 
 const PORT = Number(process.env.PORT) || 3001;
 
@@ -16,6 +17,11 @@ app.use(express.json());
 
 // Google OAuth routes (/api/auth/google, /api/auth/google/callback).
 app.use('/api/auth', authRouter);
+
+/** Connection status: true when we hold a refresh token for the user. */
+app.get('/api/auth/status', (_req, res) => {
+  res.json({ connected: getRefreshToken('user_1') !== null });
+});
 
 app.get('/', (_req, res) => {
   res.type('text/plain').send('Tickys agent server — SSE stream at POST /api/agent/run');

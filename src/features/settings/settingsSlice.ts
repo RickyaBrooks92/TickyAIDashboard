@@ -1,13 +1,15 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from '../../app/store';
 
-/** User-provided settings (Bring-Your-Own-Key). Held in memory only — not persisted. */
+/** User-provided settings + connection status. The key is held in memory only. */
 export interface SettingsState {
   aiProviderKey: string | null;
+  isGoogleConnected: boolean;
 }
 
 const initialState: SettingsState = {
   aiProviderKey: null,
+  isGoogleConnected: false,
 };
 
 const settingsSlice = createSlice({
@@ -20,15 +22,22 @@ const settingsSlice = createSlice({
     aiProviderKeyCleared(state) {
       state.aiProviderKey = null;
     },
+    googleConnectionSet(state, action: PayloadAction<boolean>) {
+      state.isGoogleConnected = action.payload;
+    },
   },
 });
 
-export const { aiProviderKeySet, aiProviderKeyCleared } = settingsSlice.actions;
+export const { aiProviderKeySet, aiProviderKeyCleared, googleConnectionSet } =
+  settingsSlice.actions;
 
 export const selectAiProviderKey = (state: RootState): string | null =>
   state.settings.aiProviderKey;
 
 export const selectHasAiProviderKey = (state: RootState): boolean =>
   Boolean(state.settings.aiProviderKey);
+
+export const selectIsGoogleConnected = (state: RootState): boolean =>
+  state.settings.isGoogleConnected;
 
 export default settingsSlice.reducer;
