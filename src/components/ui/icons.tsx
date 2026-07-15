@@ -81,3 +81,9 @@ export const PlayIcon = (props: IconProps) => (
     <path d="M6 4 20 12 6 20Z" />
   </Icon>
 );
+
+export const CheckIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M20 6 9 17l-5-5" />
+  </Icon>
+);

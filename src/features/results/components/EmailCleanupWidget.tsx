@@ -1,4 +1,5 @@
 import type { EmailResultPayload, FlaggedEmail } from '../../telemetry/types';
+import { trashEmails } from '../api';
 import { FlaggedEmailRow } from './FlaggedEmailRow';
 
 export interface EmailCleanupWidgetProps {
@@ -14,8 +15,9 @@ export function EmailCleanupWidget({ result }: EmailCleanupWidgetProps) {
   const handleKeep = (email: FlaggedEmail) => {
     console.log('[email-cleanup] keep', email.id, email.subject);
   };
-  const handleApproveDeletion = (email: FlaggedEmail) => {
+  const handleApproveDeletion = (email: FlaggedEmail): Promise<void> => {
     console.log('[email-cleanup] approve-deletion', email.id, email.subject);
+    return trashEmails([email.id]);
   };
 
   const flaggedCount = result.flaggedForDeletion.length;
