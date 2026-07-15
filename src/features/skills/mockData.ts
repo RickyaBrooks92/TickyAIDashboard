@@ -1,4 +1,5 @@
 import type { Skill } from './types';
+import emailAssistantMd from '../../../skills/email-assistant/SKILL.md?raw';
 
 const HOUR = 1000 * 60 * 60;
 const now = Date.now();
@@ -8,6 +9,14 @@ const now = Date.now();
  * load. Replaced by real file-system reads in a later phase.
  */
 export const mockSkills: Skill[] = [
+  {
+    id: 'skill-email-assistant',
+    name: 'email-assistant',
+    path: 'skills/email-assistant/SKILL.md',
+    isDirty: false,
+    lastModifiedAt: now,
+    content: emailAssistantMd,
+  },
   {
     id: 'skill-code-review',
     name: 'code-review',

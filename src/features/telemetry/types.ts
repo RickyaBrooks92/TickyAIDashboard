@@ -1,7 +1,7 @@
 import type { EpochMs } from '../../types';
 
-/** Severity of an execution log entry. */
-export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
+/** Severity or semantic tag shown as the log entry's badge. */
+export type LogLevel = 'debug' | 'info' | 'warn' | 'error' | 'success' | 'action';
 
 /** The kind of agent-loop event a log entry represents. */
 export type ExecutionEventType =

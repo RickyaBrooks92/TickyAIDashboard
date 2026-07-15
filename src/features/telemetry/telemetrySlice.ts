@@ -44,9 +44,13 @@ const telemetrySlice = createSlice({
     contextUpdated(state, action: PayloadAction<ContextWindowSnapshot>) {
       state.context = action.payload;
     },
-    /** Toggle the live-feed attachment (placeholder until a real source exists). */
+    /** Toggle the live-feed attachment (manual top-bar control). */
     streamingToggled(state) {
       state.isStreaming = !state.isStreaming;
+    },
+    /** Explicitly set the live-feed attachment (used by the agent runner). */
+    streamingSet(state, action: PayloadAction<boolean>) {
+      state.isStreaming = action.payload;
     },
   },
 });
@@ -57,6 +61,7 @@ export const {
   logCleared,
   contextUpdated,
   streamingToggled,
+  streamingSet,
 } = telemetrySlice.actions;
 
 /* ---- Selectors ---- */

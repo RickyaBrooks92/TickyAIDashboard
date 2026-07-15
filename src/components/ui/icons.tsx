@@ -75,3 +75,9 @@ export const TrashIcon = (props: IconProps) => (
     <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H7a1 1 0 0 1-1-1V6" />
   </Icon>
 );
+
+export const PlayIcon = (props: IconProps) => (
+  <Icon {...props}>
+    <path d="M6 4 20 12 6 20Z" />
+  </Icon>
+);

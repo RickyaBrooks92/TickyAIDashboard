@@ -7,6 +7,8 @@ const levelTone: Record<LogLevel, BadgeTone> = {
   info: 'sky',
   warn: 'amber',
   error: 'red',
+  success: 'emerald',
+  action: 'violet',
 };
 
 const eventTypeLabel: Record<ExecutionEventType, string> = {
