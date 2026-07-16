@@ -1,5 +1,12 @@
 import { GoogleGenAI, Type } from '@google/genai';
-import type { EmailResultPayload, FlaggedEmail, ParsedEmail } from './agentStream.ts';
+import type {
+  CleanupPriority,
+  EmailResultPayload,
+  FlaggedEmail,
+  ParsedEmail,
+} from './agentStream.ts';
+
+const PRIORITIES: readonly CleanupPriority[] = ['high', 'medium', 'low'];
 
 // JSON schema that exactly matches the frontend's EmailResultPayload interface.
 const responseSchema = {
@@ -15,9 +22,10 @@ const responseSchema = {
           sender: { type: Type.STRING },
           subject: { type: Type.STRING },
           reason: { type: Type.STRING },
+          priority: { type: Type.STRING, enum: ['high', 'medium', 'low'] },
         },
-        required: ['id', 'sender', 'subject', 'reason'],
-        propertyOrdering: ['id', 'sender', 'subject', 'reason'],
+        required: ['id', 'sender', 'subject', 'reason', 'priority'],
+        propertyOrdering: ['id', 'sender', 'subject', 'reason', 'priority'],
       },
     },
   },
@@ -40,21 +48,37 @@ function buildPrompt(emails: ParsedEmail[]): string {
     '2. In "flaggedForDeletion", include ONLY promotional, marketing, newsletter, or low-priority',
     '   automated emails that are safe to delete or archive. Never flag personal or important mail.',
     '   For each flagged email set "id" to the exact input id, copy its "sender" (the from field) and',
-    '   "subject", and give a short "reason" (e.g. "Promotional", "Low-priority automated alert").',
+    '   "subject", give a short "reason" (e.g. "Promotional", "Low-priority automated alert"), and',
+    '   set "priority" by how safe it is to delete:',
+    '     - "high": spam, junk, or obvious clutter that is clearly safe to delete',
+    '     - "medium": promotional or marketing email (sales, product news, newsletters)',
+    '     - "low": automated notifications, receipts, or social updates worth a glance first',
     '',
     `Unread emails (JSON):\n${JSON.stringify(inbox, null, 2)}`,
   ].join('\n');
 }
 
-function isFlaggedEmail(value: unknown): value is FlaggedEmail {
-  if (typeof value !== 'object' || value === null) return false;
+/**
+ * Coerce one untrusted item into a FlaggedEmail. Returns null when the core
+ * fields are missing; an unrecognized/absent priority defaults to 'medium' so a
+ * valid email is never silently dropped over a bad enum value.
+ */
+function toFlaggedEmail(value: unknown): FlaggedEmail | null {
+  if (typeof value !== 'object' || value === null) return null;
   const o = value as Record<string, unknown>;
-  return (
-    typeof o.id === 'string' &&
-    typeof o.sender === 'string' &&
-    typeof o.subject === 'string' &&
-    typeof o.reason === 'string'
-  );
+  if (
+    typeof o.id !== 'string' ||
+    typeof o.sender !== 'string' ||
+    typeof o.subject !== 'string' ||
+    typeof o.reason !== 'string'
+  ) {
+    return null;
+  }
+  const priority: CleanupPriority =
+    typeof o.priority === 'string' && (PRIORITIES as readonly string[]).includes(o.priority)
+      ? (o.priority as CleanupPriority)
+      : 'medium';
+  return { id: o.id, sender: o.sender, subject: o.subject, reason: o.reason, priority };
 }
 
 function parseResult(text: string): EmailResultPayload {
@@ -66,10 +90,12 @@ function parseResult(text: string): EmailResultPayload {
   if (typeof o.summary !== 'string' || !Array.isArray(o.flaggedForDeletion)) {
     throw new Error('Gemini result did not match EmailResultPayload.');
   }
-  return {
-    summary: o.summary,
-    flaggedForDeletion: o.flaggedForDeletion.filter(isFlaggedEmail),
-  };
+  const flaggedForDeletion: FlaggedEmail[] = [];
+  for (const item of o.flaggedForDeletion) {
+    const email = toFlaggedEmail(item);
+    if (email) flaggedForDeletion.push(email);
+  }
+  return { summary: o.summary, flaggedForDeletion };
 }
 
 /**

@@ -18,6 +18,7 @@ const initialState: TelemetryState = {
   isStreaming: false,
   activeResult: null,
   rawEmails: null,
+  selectedEmail: null,
 };
 
 /** Drop oldest entries in place so the log never exceeds its cap. */
@@ -48,11 +49,7 @@ const telemetrySlice = createSlice({
     contextUpdated(state, action: PayloadAction<ContextWindowSnapshot>) {
       state.context = action.payload;
     },
-    /** Toggle the live-feed attachment (manual top-bar control). */
-    streamingToggled(state) {
-      state.isStreaming = !state.isStreaming;
-    },
-    /** Explicitly set the live-feed attachment (used by the agent runner). */
+    /** Set the streaming flag on/off (driven by the agent runner's lifecycle). */
     streamingSet(state, action: PayloadAction<boolean>) {
       state.isStreaming = action.payload;
     },
@@ -68,9 +65,18 @@ const telemetrySlice = createSlice({
     inboxFetched(state, action: PayloadAction<ParsedEmail[]>) {
       state.rawEmails = action.payload;
     },
-    /** Clear the raw emails (e.g. at the start of a new run). */
+    /** Clear the raw emails + any open reader (e.g. at the start of a new run). */
     rawEmailsCleared(state) {
       state.rawEmails = null;
+      state.selectedEmail = null;
+    },
+    /** Open an email in the center reader. */
+    emailOpened(state, action: PayloadAction<ParsedEmail>) {
+      state.selectedEmail = action.payload;
+    },
+    /** Close the center reader (back to the skill editor). */
+    emailClosed(state) {
+      state.selectedEmail = null;
     },
   },
 });
@@ -80,12 +86,13 @@ export const {
   logBatchAppended,
   logCleared,
   contextUpdated,
-  streamingToggled,
   streamingSet,
   resultReceived,
   resultCleared,
   inboxFetched,
   rawEmailsCleared,
+  emailOpened,
+  emailClosed,
 } = telemetrySlice.actions;
 
 /* ---- Selectors ---- */
@@ -104,6 +111,9 @@ export const selectActiveResult = (state: RootState): EmailResultPayload | null 
 
 export const selectRawEmails = (state: RootState): ParsedEmail[] | null =>
   state.telemetry.rawEmails;
+
+export const selectSelectedEmail = (state: RootState): ParsedEmail | null =>
+  state.telemetry.selectedEmail;
 
 /** Fraction (0–1) of the context window in use. */
 export const selectContextUsageRatio = (state: RootState): number => {

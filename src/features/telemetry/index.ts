@@ -12,7 +12,6 @@ export {
   logBatchAppended,
   logCleared,
   contextUpdated,
-  streamingToggled,
   streamingSet,
   resultReceived,
   resultCleared,
@@ -34,5 +33,6 @@ export type {
   ExecutionEventType,
   EmailResultPayload,
   FlaggedEmail,
+  CleanupPriority,
   ParsedEmail,
 } from './types';

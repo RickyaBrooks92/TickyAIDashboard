@@ -38,11 +38,15 @@ export interface ContextWindowSnapshot {
   updatedAt: number;
 }
 
+/** How safe an email is to delete — drives the color-coded Results grouping. */
+export type CleanupPriority = 'high' | 'medium' | 'low';
+
 export interface FlaggedEmail {
   id: string;
   sender: string;
   subject: string;
   reason: string;
+  priority: CleanupPriority;
 }
 
 export interface EmailResultPayload {

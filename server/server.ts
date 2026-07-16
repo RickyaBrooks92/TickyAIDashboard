@@ -4,7 +4,7 @@ import express from 'express';
 import { runEmailAgent } from './agentRunner.ts';
 import { logEvent, type AgentRunRequest, type AgentStreamEvent } from './agentStream.ts';
 import { authRouter, isGoogleConfigured } from './auth.ts';
-import { trashMessages } from './gmail.ts';
+import { fetchMessageBody, trashMessages } from './gmail.ts';
 import { clearTokens, getRefreshToken } from './tokenStore.ts';
 
 const PORT = Number(process.env.PORT) || 3001;
@@ -96,6 +96,22 @@ app.post('/api/agent/run', async (req, res) => {
   } finally {
     // Always terminate the stream so the browser's fetchEventSource stops waiting.
     if (!res.writableEnded) res.end();
+  }
+});
+
+/** Fetch a single email's full body as plain text (user-initiated on click). */
+app.get('/api/agent/message/:id', async (req, res) => {
+  const id = req.params.id;
+  if (!id) {
+    res.status(400).json({ ok: false, error: 'Missing message id' });
+    return;
+  }
+  try {
+    const body = await fetchMessageBody('user_1', id);
+    res.json({ id, body });
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Unknown error';
+    res.status(500).json({ ok: false, error: message });
   }
 });
 

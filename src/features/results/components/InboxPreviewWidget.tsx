@@ -1,13 +1,13 @@
-import { useAppSelector } from '../../../app/hooks';
-import { selectRawEmails } from '../../telemetry/telemetrySlice';
+import { useAppDispatch, useAppSelector } from '../../../app/hooks';
+import { emailOpened, selectRawEmails } from '../../telemetry/telemetrySlice';
 
 /**
- * Compact preview of the raw emails the agent just fetched from Gmail, shown
- * above the AI result so the user sees exactly what is being processed.
- * Self-hides until the emails arrive.
+ * Compact list of the raw emails the agent fetched from Gmail. Each row opens the
+ * full email in the center reader. Self-hides until the emails arrive.
  */
 export function InboxPreviewWidget() {
   const rawEmails = useAppSelector(selectRawEmails);
+  const dispatch = useAppDispatch();
   if (!rawEmails || rawEmails.length === 0) return null;
 
   return (
@@ -22,11 +22,17 @@ export function InboxPreviewWidget() {
       </div>
       <ul className="divide-y divide-zinc-800/60 overflow-hidden rounded-md border border-zinc-800 bg-zinc-900/40">
         {rawEmails.map((email) => (
-          <li key={email.id} className="px-3 py-2">
-            <p className="truncate text-xs font-medium text-zinc-200">
-              {email.subject || '(no subject)'}
-            </p>
-            <p className="truncate font-mono text-[11px] text-zinc-500">{email.from}</p>
+          <li key={email.id}>
+            <button
+              type="button"
+              onClick={() => dispatch(emailOpened(email))}
+              className="block w-full min-w-0 px-3 py-2 text-left transition-colors hover:bg-zinc-800/50"
+            >
+              <p className="truncate text-xs font-medium text-zinc-200">
+                {email.subject || '(no subject)'}
+              </p>
+              <p className="truncate font-mono text-[11px] text-zinc-500">{email.from}</p>
+            </button>
           </li>
         ))}
       </ul>

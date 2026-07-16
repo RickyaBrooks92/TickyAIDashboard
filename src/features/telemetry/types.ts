@@ -40,12 +40,16 @@ export interface ContextWindowSnapshot {
   updatedAt: EpochMs;
 }
 
+/** How safe an email is to delete — drives the color-coded Results grouping. */
+export type CleanupPriority = 'high' | 'medium' | 'low';
+
 /** One email the agent proposes to delete/archive; awaits human approval. */
 export interface FlaggedEmail {
   id: string;
   sender: string;
   subject: string;
   reason: string;
+  priority: CleanupPriority;
 }
 
 /** Structured JSON result emitted by the email-assistant agent. */
@@ -86,10 +90,12 @@ export interface TelemetryState {
   log: ExecutionLogEntry[];
   maxLogEntries: number;
   context: ContextWindowSnapshot | null;
-  /** Whether a live feed is currently attached (future phase). */
+  /** True while an agent run is actively streaming events. */
   isStreaming: boolean;
   /** Latest structured agent result, rendered in the Results tab. */
   activeResult: EmailResultPayload | null;
   /** Raw emails fetched from Gmail this run, shown before the AI result. */
   rawEmails: ParsedEmail[] | null;
+  /** The email currently opened in the center reader, or null when closed. */
+  selectedEmail: ParsedEmail | null;
 }
