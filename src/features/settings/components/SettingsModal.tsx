@@ -4,7 +4,9 @@ import { cx } from '../../../lib/cx';
 import {
   aiProviderKeyCleared,
   aiProviderKeySet,
+  modelSelected,
   selectAiProviderKey,
+  selectSelectedModel,
 } from '../settingsSlice';
 
 export interface SettingsModalProps {
@@ -12,9 +14,16 @@ export interface SettingsModalProps {
   onClose: () => void;
 }
 
+/** Gemini models the user can run the agent with. */
+const MODEL_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
+  { value: 'gemini-2.5-flash', label: 'gemini-2.5-flash — fast, lightweight (default)' },
+  { value: 'gemini-2.5-pro', label: 'gemini-2.5-pro — advanced reasoning (pro)' },
+];
+
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const dispatch = useAppDispatch();
   const currentKey = useAppSelector(selectAiProviderKey);
+  const selectedModel = useAppSelector(selectSelectedModel);
   const [draft, setDraft] = useState('');
   const [reveal, setReveal] = useState(false);
 
@@ -73,41 +82,66 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
           </button>
         </header>
 
-        <div className="px-4 py-4">
-          <label htmlFor="ai-key" className="text-xs font-medium text-zinc-300">
-            Gemini API key
-          </label>
-          <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
-            Bring your own key — get one free at Google AI Studio. Stored in memory only
-            (cleared on refresh) and sent with each agent run.
-          </p>
-          <div className="mt-2 flex items-center gap-2">
-            <input
-              id="ai-key"
-              type={reveal ? 'text' : 'password'}
-              value={draft}
-              onChange={(e) => setDraft(e.target.value)}
-              placeholder="Paste your Gemini API key"
-              autoComplete="off"
-              spellCheck={false}
-              className="min-w-0 flex-1 rounded-md border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 font-mono text-xs text-zinc-100 outline-none focus:border-violet-500"
-            />
-            <button
-              type="button"
-              onClick={() => setReveal((r) => !r)}
-              className="shrink-0 rounded-md border border-zinc-700 px-2 py-1.5 text-[11px] text-zinc-300 transition-colors hover:bg-zinc-800"
+        <div className="space-y-4 px-4 py-4">
+          {/* Model */}
+          <div>
+            <label htmlFor="ai-model" className="text-xs font-medium text-zinc-300">
+              Model
+            </label>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
+              Which Gemini model the agent uses to categorize your inbox.
+            </p>
+            <select
+              id="ai-model"
+              value={selectedModel}
+              onChange={(e) => dispatch(modelSelected(e.target.value))}
+              className="mt-2 w-full rounded-md border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 text-xs text-zinc-100 outline-none focus:border-violet-500"
             >
-              {reveal ? 'Hide' : 'Show'}
-            </button>
+              {MODEL_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
           </div>
-          <p
-            className={cx(
-              'mt-2 text-[11px]',
-              currentKey ? 'text-emerald-400' : 'text-zinc-500',
-            )}
-          >
-            {currentKey ? '● Key saved (in memory)' : '○ No key set'}
-          </p>
+
+          {/* API key */}
+          <div>
+            <label htmlFor="ai-key" className="text-xs font-medium text-zinc-300">
+              Gemini API key
+            </label>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
+              Bring your own key — get one free at Google AI Studio. Stored in memory only
+              (cleared on refresh) and sent with each agent run.
+            </p>
+            <div className="mt-2 flex items-center gap-2">
+              <input
+                id="ai-key"
+                type={reveal ? 'text' : 'password'}
+                value={draft}
+                onChange={(e) => setDraft(e.target.value)}
+                placeholder="Paste your Gemini API key"
+                autoComplete="off"
+                spellCheck={false}
+                className="min-w-0 flex-1 rounded-md border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 font-mono text-xs text-zinc-100 outline-none focus:border-violet-500"
+              />
+              <button
+                type="button"
+                onClick={() => setReveal((r) => !r)}
+                className="shrink-0 rounded-md border border-zinc-700 px-2 py-1.5 text-[11px] text-zinc-300 transition-colors hover:bg-zinc-800"
+              >
+                {reveal ? 'Hide' : 'Show'}
+              </button>
+            </div>
+            <p
+              className={cx(
+                'mt-2 text-[11px]',
+                currentKey ? 'text-emerald-400' : 'text-zinc-500',
+              )}
+            >
+              {currentKey ? '● Key saved (in memory)' : '○ No key set'}
+            </p>
+          </div>
         </div>
 
         <footer className="flex items-center justify-between border-t border-zinc-800 px-4 py-3">

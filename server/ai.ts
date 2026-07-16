@@ -80,10 +80,11 @@ function parseResult(text: string): EmailResultPayload {
 export async function categorizeInbox(
   emails: ParsedEmail[],
   apiKey: string,
+  model: string,
 ): Promise<EmailResultPayload> {
   const ai = new GoogleGenAI({ apiKey });
   const response = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model,
     contents: buildPrompt(emails),
     config: {
       responseMimeType: 'application/json',

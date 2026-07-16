@@ -1,27 +1,56 @@
-import { useAppSelector } from '../../../app/hooks';
-import { selectIsGoogleConnected } from '../../settings/settingsSlice';
+import { useState } from 'react';
+import { useAppDispatch, useAppSelector } from '../../../app/hooks';
+import { cx } from '../../../lib/cx';
+import { googleConnectionSet, selectIsGoogleConnected } from '../../settings/settingsSlice';
+import { rawEmailsCleared, resultCleared } from '../../telemetry/telemetrySlice';
+import { disconnectGoogleAccount } from '../api';
 
 /** Server endpoint that starts the Google OAuth consent flow. */
 const GOOGLE_AUTH_URL = 'http://localhost:3001/api/auth/google';
 
 export function ConnectGoogleButton() {
+  const dispatch = useAppDispatch();
   const isConnected = useAppSelector(selectIsGoogleConnected);
+  const [hovered, setHovered] = useState(false);
+  const [busy, setBusy] = useState(false);
 
+  const handleDisconnect = async () => {
+    if (busy) return;
+    setBusy(true);
+    const ok = await disconnectGoogleAccount();
+    if (ok) {
+      dispatch(googleConnectionSet(false));
+      // Wipe residual state from the connected account's last run.
+      dispatch(rawEmailsCleared());
+      dispatch(resultCleared());
+    }
+    setBusy(false);
+    setHovered(false);
+  };
+
+  // Connected: green by default, turns into a red "Disconnect Workspace" on hover.
   if (isConnected) {
     return (
       <button
         type="button"
-        disabled
-        title="Google Workspace connected"
-        className="flex cursor-default items-center gap-1.5 rounded-md border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-300"
+        onClick={() => void handleDisconnect()}
+        onMouseEnter={() => setHovered(true)}
+        onMouseLeave={() => setHovered(false)}
+        title={hovered ? 'Disconnect this Google account' : 'Google Workspace connected'}
+        className={cx(
+          'flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium transition-colors',
+          hovered
+            ? 'border-red-500/50 bg-red-500/10 text-red-300'
+            : 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300',
+        )}
       >
-        ✅ Workspace Connected
+        {busy ? 'Disconnecting…' : hovered ? 'Disconnect Workspace' : '✅ Workspace Connected'}
       </button>
     );
   }
 
+  // Disconnected: the standard OAuth-start button.
   const handleConnect = () => {
-    // Full-page navigation — we must leave the SPA to reach Google's consent screen.
     window.location.href = GOOGLE_AUTH_URL;
   };
 

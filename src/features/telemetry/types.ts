@@ -74,6 +74,12 @@ export type AgentStreamEvent =
   | { type: 'result'; result: EmailResultPayload }
   | { type: 'done' };
 
+/** Body of POST /api/agent/run (mirrors `server/agentStream.ts`). */
+export interface AgentRunRequest {
+  skill?: string;
+  model?: string;
+}
+
 /** Root shape of the telemetry slice. */
 export interface TelemetryState {
   /** Append-only event stream, capped at `maxLogEntries` (ring buffer). */

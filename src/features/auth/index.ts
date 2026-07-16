@@ -1,2 +1,2 @@
 export { ConnectGoogleButton } from './components/ConnectGoogleButton';
-export { fetchGoogleConnectionStatus } from './api';
+export { fetchGoogleConnectionStatus, disconnectGoogleAccount } from './api';

@@ -2,6 +2,7 @@ import type { AgentStreamEvent, ContextBlock, ParsedEmail } from './agentStream.
 import { estimateTokens, logEvent, snapshot } from './agentStream.ts';
 import { categorizeInbox } from './ai.ts';
 import { fetchUnreadEmails } from './gmail.ts';
+import { getRefreshToken } from './tokenStore.ts';
 
 type Send = (event: AgentStreamEvent) => void;
 
@@ -38,9 +39,19 @@ export async function runEmailAgent(
   send: Send,
   userId: string,
   apiKey: string,
+  model: string,
 ): Promise<void> {
   try {
     send(logEvent('info', 'system', 'Authenticating with Google Workspace...'));
+
+    // Validate the stored OAuth token before doing any work: a token with no
+    // refresh_token can't be used for offline Gmail access.
+    const refreshToken = getRefreshToken(userId);
+    if (!refreshToken) {
+      throw new Error(
+        'Google OAuth token is missing a refresh token. Please revoke access in your Google Account and reconnect.',
+      );
+    }
 
     const emails = await fetchUnreadEmails(userId);
 
@@ -67,7 +78,7 @@ export async function runEmailAgent(
       return;
     }
 
-    const result = await categorizeInbox(emails, apiKey);
+    const result = await categorizeInbox(emails, apiKey, model);
 
     const geminiBlock: ContextBlock = {
       id: 'ctx-gemini',
@@ -88,8 +99,14 @@ export async function runEmailAgent(
     );
     send({ type: 'done' });
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Unknown error';
-    send(logEvent('error', 'system', `Agent run failed: ${message}`));
+    // Log the full error (with stack) to the server console only — never to the client.
+    console.error('[agentRunner] run failed:', err);
+    // Send ONLY the message down the SSE stream (no stack-trace leak).
+    const message =
+      err instanceof Error && err.message
+        ? err.message
+        : 'An unexpected error occurred during execution';
+    send(logEvent('error', 'system', message));
     send({ type: 'done' });
   }
 }

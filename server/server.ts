@@ -2,12 +2,15 @@ import cors from 'cors';
 import 'dotenv/config';
 import express from 'express';
 import { runEmailAgent } from './agentRunner.ts';
-import { logEvent, type AgentStreamEvent } from './agentStream.ts';
+import { logEvent, type AgentRunRequest, type AgentStreamEvent } from './agentStream.ts';
 import { authRouter, isGoogleConfigured } from './auth.ts';
 import { trashMessages } from './gmail.ts';
-import { getRefreshToken } from './tokenStore.ts';
+import { clearTokens, getRefreshToken } from './tokenStore.ts';
 
 const PORT = Number(process.env.PORT) || 3001;
+
+/** Default Gemini model when the request omits one. */
+const DEFAULT_MODEL = 'gemini-2.5-flash';
 
 const app = express();
 
@@ -21,6 +24,12 @@ app.use('/api/auth', authRouter);
 /** Connection status: true when we hold a refresh token for the user. */
 app.get('/api/auth/status', (_req, res) => {
   res.json({ connected: getRefreshToken('user_1') !== null });
+});
+
+/** Disconnect: erase the stored token so the user can re-authenticate cleanly. */
+app.post('/api/auth/disconnect', (_req, res) => {
+  clearTokens();
+  res.json({ success: true });
 });
 
 app.get('/', (_req, res) => {
@@ -63,9 +72,28 @@ app.post('/api/agent/run', async (req, res) => {
     return;
   }
 
-  await runEmailAgent(send, 'user_1', apiKey);
+  // Pick the model from the request body, falling back to a safe default.
+  const body = req.body as AgentRunRequest;
+  const model =
+    typeof body?.model === 'string' && body.model.trim().length > 0
+      ? body.model.trim()
+      : DEFAULT_MODEL;
 
-  if (!res.writableEnded) res.end();
+  try {
+    await runEmailAgent(send, 'user_1', apiKey, model);
+  } catch (err) {
+    // runEmailAgent handles its own errors; this guards against anything unexpected.
+    console.error('[server] /api/agent/run crashed:', err);
+    const message =
+      err instanceof Error && err.message
+        ? err.message
+        : 'An unexpected error occurred during execution';
+    send(logEvent('error', 'system', message));
+    send({ type: 'done' });
+  } finally {
+    // Always terminate the stream so the browser's fetchEventSource stops waiting.
+    if (!res.writableEnded) res.end();
+  }
 });
 
 /** Validate an untrusted POST body into a `string[]` of message ids. */

@@ -6,9 +6,11 @@ export {
   aiProviderKeySet,
   aiProviderKeyCleared,
   googleConnectionSet,
+  modelSelected,
   selectAiProviderKey,
   selectHasAiProviderKey,
   selectIsGoogleConnected,
+  selectSelectedModel,
 } from './settingsSlice';
 
 export type { SettingsState } from './settingsSlice';

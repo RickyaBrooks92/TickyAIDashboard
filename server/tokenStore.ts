@@ -1,4 +1,4 @@
-import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 
 // Stored next to this module (server/tokens.json). Gitignored.
@@ -41,4 +41,13 @@ export function saveRefreshToken(userId: string, refreshToken: string, scope?: s
 /** Read a user's stored refresh token, or null if none. */
 export function getRefreshToken(userId: string): string | null {
   return readDb()[userId]?.refreshToken ?? null;
+}
+
+/** Erase the token store file. Quietly no-ops if it doesn't exist. */
+export function clearTokens(): void {
+  try {
+    if (existsSync(TOKENS_PATH)) unlinkSync(TOKENS_PATH);
+  } catch {
+    // Already gone or unreadable — nothing to clean up.
+  }
 }

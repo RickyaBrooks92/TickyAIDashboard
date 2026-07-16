@@ -1,8 +1,12 @@
-/** Backend endpoint reporting whether a Google account is connected. */
 const STATUS_URL = 'http://localhost:3001/api/auth/status';
+const DISCONNECT_URL = 'http://localhost:3001/api/auth/disconnect';
 
 interface StatusResponse {
   connected: boolean;
+}
+
+interface DisconnectResponse {
+  success: boolean;
 }
 
 /**
@@ -17,5 +21,20 @@ export async function fetchGoogleConnectionStatus(): Promise<boolean> {
     return data.connected === true;
   } catch {
     return false; // backend unreachable
+  }
+}
+
+/**
+ * Erase the stored Google token on the server. Returns `true` on success,
+ * `false` if the request fails.
+ */
+export async function disconnectGoogleAccount(): Promise<boolean> {
+  try {
+    const response = await fetch(DISCONNECT_URL, { method: 'POST' });
+    if (!response.ok) return false;
+    const data = (await response.json()) as DisconnectResponse;
+    return data.success === true;
+  } catch {
+    return false;
   }
 }

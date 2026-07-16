@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { selectAiProviderKey } from '../../settings/settingsSlice';
+import { selectAiProviderKey, selectSelectedModel } from '../../settings/settingsSlice';
 import { selectSelectedSkill } from '../../skills/skillsSlice';
 import {
   contextUpdated,
@@ -12,7 +12,7 @@ import {
   resultReceived,
   streamingSet,
 } from '../telemetrySlice';
-import type { AgentStreamEvent } from '../types';
+import type { AgentRunRequest, AgentStreamEvent } from '../types';
 
 /** Local SSE endpoint exposed by the Node/Express agent runner (server/). */
 const AGENT_RUN_URL = 'http://localhost:3001/api/agent/run';
@@ -35,6 +35,7 @@ export function useAgentRunner(): UseAgentRunner {
   const dispatch = useAppDispatch();
   const skill = useAppSelector(selectSelectedSkill);
   const apiKey = useAppSelector(selectAiProviderKey);
+  const model = useAppSelector(selectSelectedModel);
   const [isRunning, setIsRunning] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
   const completedRef = useRef(false);
@@ -77,7 +78,7 @@ export function useAgentRunner(): UseAgentRunner {
         // helpful error frame in that case).
         'x-ai-provider-key': apiKey ?? '',
       },
-      body: JSON.stringify({ skill: skill.name }),
+      body: JSON.stringify({ skill: skill.name, model } satisfies AgentRunRequest),
       signal: controller.signal,
       openWhenHidden: true,
       onmessage(message) {
@@ -128,7 +129,7 @@ export function useAgentRunner(): UseAgentRunner {
     }).catch(() => {
       // Terminal errors are surfaced via onerror/onclose; swallow the rejection.
     });
-  }, [apiKey, dispatch, finish, isRunning, skill]);
+  }, [apiKey, dispatch, finish, isRunning, model, skill]);
 
   return { isRunning, canRun: Boolean(skill) && !isRunning, run };
 }

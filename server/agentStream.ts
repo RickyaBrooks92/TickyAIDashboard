@@ -67,6 +67,12 @@ export type AgentStreamEvent =
   | { type: 'result'; result: EmailResultPayload }
   | { type: 'done' };
 
+/** Body of POST /api/agent/run (mirrors the frontend request). */
+export interface AgentRunRequest {
+  skill?: string;
+  model?: string;
+}
+
 export const MAX_CONTEXT_TOKENS = 200_000;
 
 /** Build a `log` SSE frame with a generated id + timestamp. */
