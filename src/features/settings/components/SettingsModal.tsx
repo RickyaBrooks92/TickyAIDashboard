@@ -15,9 +15,9 @@ export interface SettingsModalProps {
 }
 
 /** Gemini models the user can run the agent with. */
+/** Suggested models (the input is free-text, so any model id also works). */
 const MODEL_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
-  { value: 'gemini-2.5-flash', label: 'gemini-2.5-flash — fast, lightweight (default)' },
-  { value: 'gemini-2.5-pro', label: 'gemini-2.5-pro — advanced reasoning (pro)' },
+  { value: 'gemini-flash-latest', label: 'confirmed working' },
 ];
 
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
@@ -89,20 +89,26 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               Model
             </label>
             <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
-              Which Gemini model the agent uses to categorize your inbox.
+              gemini-flash-latest is the confirmed-working model. You can type a
+              different model id if your key (e.g. a paid key) supports one.
             </p>
-            <select
+            <input
               id="ai-model"
+              list="ai-model-options"
               value={selectedModel}
               onChange={(e) => dispatch(modelSelected(e.target.value))}
-              className="mt-2 w-full rounded-md border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 text-xs text-zinc-100 outline-none focus:border-violet-500"
-            >
+              placeholder="gemini-flash-latest"
+              autoComplete="off"
+              spellCheck={false}
+              className="mt-2 w-full rounded-md border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 font-mono text-xs text-zinc-100 outline-none focus:border-violet-500"
+            />
+            <datalist id="ai-model-options">
               {MODEL_OPTIONS.map((option) => (
                 <option key={option.value} value={option.value}>
                   {option.label}
                 </option>
               ))}
-            </select>
+            </datalist>
           </div>
 
           {/* API key */}
@@ -111,8 +117,9 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
               Gemini API key
             </label>
             <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
-              Bring your own key — get one free at Google AI Studio. Stored in memory only
-              (cleared on refresh) and sent with each agent run.
+              Bring your own key — get one free at Google AI Studio. Saved in this browser
+              (localStorage) so it persists across refreshes, and sent with each agent run.
+              Use “Clear key” to remove it.
             </p>
             <div className="mt-2 flex items-center gap-2">
               <input
@@ -139,7 +146,7 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 currentKey ? 'text-emerald-400' : 'text-zinc-500',
               )}
             >
-              {currentKey ? '● Key saved (in memory)' : '○ No key set'}
+              {currentKey ? '● Key saved (this browser)' : '○ No key set'}
             </p>
           </div>
         </div>

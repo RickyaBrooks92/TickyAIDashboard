@@ -81,6 +81,13 @@ export function useAgentRunner(): UseAgentRunner {
       body: JSON.stringify({ skill: skill.name, model } satisfies AgentRunRequest),
       signal: controller.signal,
       openWhenHidden: true,
+      async onopen(response) {
+        if (!response.ok) {
+          throw new Error(`Agent run request failed (HTTP ${response.status})`);
+        }
+        // Proceed regardless of content-type — don't let the library's strict
+        // text/event-stream check silently abort the stream.
+      },
       onmessage(message) {
         let event: AgentStreamEvent;
         try {
@@ -127,7 +134,8 @@ export function useAgentRunner(): UseAgentRunner {
         throw err; // never auto-retry a one-shot run
       },
     }).catch(() => {
-      // Terminal errors are surfaced via onerror/onclose; swallow the rejection.
+      // Real failures are surfaced to the telemetry log in onerror; a normal
+      // close rejects with our own 'stream complete' sentinel — ignore both here.
     });
   }, [apiKey, dispatch, finish, isRunning, model, skill]);
 

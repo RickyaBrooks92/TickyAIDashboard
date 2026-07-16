@@ -10,7 +10,7 @@ import { clearTokens, getRefreshToken } from './tokenStore.ts';
 const PORT = Number(process.env.PORT) || 3001;
 
 /** Default Gemini model when the request omits one. */
-const DEFAULT_MODEL = 'gemini-2.5-flash';
+const DEFAULT_MODEL = 'gemini-flash-latest';
 
 const app = express();
 
@@ -48,7 +48,10 @@ app.post('/api/agent/run', async (req, res) => {
   res.flushHeaders();
 
   let closed = false;
-  req.on('close', () => {
+  // Use the RESPONSE 'close' — req 'close' fires spuriously once the POST body is
+  // consumed (Express 5 / Node), which was wrongly marking the stream dead and
+  // skipping every frame after the first.
+  res.on('close', () => {
     closed = true;
   });
 

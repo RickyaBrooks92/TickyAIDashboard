@@ -1,4 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
+import { settingsListenerMiddleware } from '../features/settings/persistenceListener';
 import settingsReducer from '../features/settings/settingsSlice';
 import skillsReducer from '../features/skills/skillsSlice';
 import telemetryReducer from '../features/telemetry/telemetrySlice';
@@ -9,6 +10,8 @@ export const store = configureStore({
     skills: skillsReducer,
     telemetry: telemetryReducer,
   },
+  middleware: (getDefaultMiddleware) =>
+    getDefaultMiddleware().prepend(settingsListenerMiddleware.middleware),
 });
 
 /** Full state tree — inferred from the store, the single source of truth. */

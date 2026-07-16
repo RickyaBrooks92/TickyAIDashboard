@@ -1,17 +1,23 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from '../../app/store';
+import { loadPersistedSettings } from './persistence';
 
-/** User-provided settings + connection status. The key is held in memory only. */
+/** User-provided settings + connection status. */
 export interface SettingsState {
   aiProviderKey: string | null;
   isGoogleConnected: boolean;
   selectedModel: string;
 }
 
+// Hydrate the key + model from localStorage so they survive a refresh. The
+// Google connection is intentionally NOT persisted — it's re-derived from the
+// server's /api/auth/status on load.
+const persisted = loadPersistedSettings();
+
 const initialState: SettingsState = {
-  aiProviderKey: null,
+  aiProviderKey: persisted.aiProviderKey ?? null,
   isGoogleConnected: false,
-  selectedModel: 'gemini-2.5-flash',
+  selectedModel: persisted.selectedModel ?? 'gemini-flash-latest',
 };
 
 const settingsSlice = createSlice({

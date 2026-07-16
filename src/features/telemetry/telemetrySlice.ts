@@ -7,14 +7,14 @@ import type {
   ParsedEmail,
   TelemetryState,
 } from './types';
-import { mockContext, mockLog } from './mockData';
 
 const DEFAULT_MAX_LOG_ENTRIES = 500;
 
+// Starts empty — the log and context populate live once an agent run streams in.
 const initialState: TelemetryState = {
-  log: mockLog,
+  log: [],
   maxLogEntries: DEFAULT_MAX_LOG_ENTRIES,
-  context: mockContext,
+  context: null,
   isStreaming: false,
   activeResult: null,
   rawEmails: null,
