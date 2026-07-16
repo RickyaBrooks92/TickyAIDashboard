@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { cx } from '../../../lib/cx';
+import { resetAllAgentModules } from '../../agents/registry';
 import { googleConnectionSet, selectIsGoogleConnected } from '../../settings/settingsSlice';
-import { rawEmailsCleared, resultCleared } from '../../telemetry/telemetrySlice';
 import { disconnectGoogleAccount } from '../api';
 
 /** Server endpoint that starts the Google OAuth consent flow. */
@@ -20,9 +20,8 @@ export function ConnectGoogleButton() {
     const ok = await disconnectGoogleAccount();
     if (ok) {
       dispatch(googleConnectionSet(false));
-      // Wipe residual state from the connected account's last run.
-      dispatch(rawEmailsCleared());
-      dispatch(resultCleared());
+      // Wipe residual state from every agent module's last run.
+      resetAllAgentModules(dispatch);
     }
     setBusy(false);
     setHovered(false);

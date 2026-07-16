@@ -1,8 +1,8 @@
 import { useMemo, useState } from 'react';
-import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { Badge, type BadgeTone } from '../../../components/ui/Badge';
-import { emailOpened, selectRawEmails } from '../../telemetry/telemetrySlice';
-import type { CleanupPriority, EmailResultPayload, FlaggedEmail } from '../../telemetry/types';
+import { useAppDispatch, useAppSelector } from '../../../../app/hooks';
+import { Badge, type BadgeTone } from '../../../../components/ui/Badge';
+import { emailOpened, selectRawEmails } from '../emailSlice';
+import type { CleanupPriority, EmailResultPayload, FlaggedEmail } from '../../../telemetry/types';
 import { trashEmails } from '../api';
 import { FlaggedEmailRow, type RowStatus } from './FlaggedEmailRow';
 

@@ -1,4 +1,5 @@
 import { configureStore } from '@reduxjs/toolkit';
+import emailReducer from '../features/agents/email-assistant/emailSlice';
 import { settingsListenerMiddleware } from '../features/settings/persistenceListener';
 import settingsReducer from '../features/settings/settingsSlice';
 import skillsReducer from '../features/skills/skillsSlice';
@@ -9,6 +10,7 @@ export const store = configureStore({
     settings: settingsReducer,
     skills: skillsReducer,
     telemetry: telemetryReducer,
+    email: emailReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware().prepend(settingsListenerMiddleware.middleware),

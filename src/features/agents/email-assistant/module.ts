@@ -1,4 +1,4 @@
-import type { AgentModule } from '../agents/AgentModule';
+import type { AgentModule } from '../AgentModule';
 import {
   inboxFetched,
   rawEmailsCleared,
@@ -7,7 +7,7 @@ import {
   selectActiveResult,
   selectRawEmails,
   selectSelectedEmail,
-} from '../telemetry/telemetrySlice';
+} from './emailSlice';
 import { EmailDetailView } from './components/EmailDetailView';
 import { EmailResultView } from './components/EmailResultView';
 import { InboxPreviewWidget } from './components/InboxPreviewWidget';

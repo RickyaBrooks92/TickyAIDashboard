@@ -13,16 +13,10 @@ export {
   logCleared,
   contextUpdated,
   streamingSet,
-  resultReceived,
-  resultCleared,
-  inboxFetched,
-  rawEmailsCleared,
   selectLog,
   selectContext,
   selectIsStreaming,
   selectContextUsageRatio,
-  selectActiveResult,
-  selectRawEmails,
 } from './telemetrySlice';
 
 export type {

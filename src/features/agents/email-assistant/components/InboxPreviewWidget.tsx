@@ -1,5 +1,5 @@
-import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { emailOpened, selectRawEmails } from '../../telemetry/telemetrySlice';
+import { useAppDispatch, useAppSelector } from '../../../../app/hooks';
+import { emailOpened, selectRawEmails } from '../emailSlice';
 
 /**
  * Compact list of the raw emails the agent fetched from Gmail. Each row opens the

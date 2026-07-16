@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { TrashIcon } from '../../../components/ui/icons';
-import { emailClosed, selectSelectedEmail } from '../../telemetry/telemetrySlice';
+import { useAppDispatch, useAppSelector } from '../../../../app/hooks';
+import { TrashIcon } from '../../../../components/ui/icons';
+import { emailClosed, selectSelectedEmail } from '../emailSlice';
 import { fetchEmailBody, trashEmails } from '../api';
 
 type LoadState =

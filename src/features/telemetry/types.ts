@@ -84,7 +84,10 @@ export interface AgentRunRequest {
   model?: string;
 }
 
-/** Root shape of the telemetry slice. */
+/**
+ * Root shape of the (generic) telemetry slice — run observability only. Agent
+ * result state lives in each agent module's own slice.
+ */
 export interface TelemetryState {
   /** Append-only event stream, capped at `maxLogEntries` (ring buffer). */
   log: ExecutionLogEntry[];
@@ -92,10 +95,4 @@ export interface TelemetryState {
   context: ContextWindowSnapshot | null;
   /** True while an agent run is actively streaming events. */
   isStreaming: boolean;
-  /** Latest structured agent result, rendered in the Results tab. */
-  activeResult: EmailResultPayload | null;
-  /** Raw emails fetched from Gmail this run, shown before the AI result. */
-  rawEmails: ParsedEmail[] | null;
-  /** The email currently opened in the center reader, or null when closed. */
-  selectedEmail: ParsedEmail | null;
 }

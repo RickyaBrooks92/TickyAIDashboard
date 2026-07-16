@@ -1,7 +1,7 @@
-import { Badge, type BadgeTone } from '../../../components/ui/Badge';
-import { CheckIcon } from '../../../components/ui/icons';
-import { cx } from '../../../lib/cx';
-import type { FlaggedEmail } from '../../telemetry/types';
+import { Badge, type BadgeTone } from '../../../../components/ui/Badge';
+import { CheckIcon } from '../../../../components/ui/icons';
+import { cx } from '../../../../lib/cx';
+import type { FlaggedEmail } from '../../../telemetry/types';
 
 /** Per-email lifecycle. Owned by the parent widget so bulk actions can drive it. */
 export type RowStatus = 'idle' | 'trashing' | 'trashed' | 'error' | 'kept';
