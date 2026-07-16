@@ -1,4 +1,3 @@
-export { AgentResultCanvas } from './components/AgentResultCanvas';
 export { EmailCleanupWidget } from './components/EmailCleanupWidget';
 export type { EmailCleanupWidgetProps } from './components/EmailCleanupWidget';
 export { FlaggedEmailRow } from './components/FlaggedEmailRow';

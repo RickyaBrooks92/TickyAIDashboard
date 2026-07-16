@@ -3,15 +3,8 @@ import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
 import { selectAiProviderKey, selectSelectedModel } from '../../settings/settingsSlice';
 import { selectSelectedSkill } from '../../skills/skillsSlice';
-import {
-  contextUpdated,
-  inboxFetched,
-  logAppended,
-  rawEmailsCleared,
-  resultCleared,
-  resultReceived,
-  streamingSet,
-} from '../telemetrySlice';
+import { getAgentModule } from '../../agents/registry';
+import { contextUpdated, logAppended, streamingSet } from '../telemetrySlice';
 import type { AgentRunRequest, AgentStreamEvent } from '../types';
 
 /** Local SSE endpoint exposed by the Node/Express agent runner (server/). */
@@ -61,8 +54,9 @@ export function useAgentRunner(): UseAgentRunner {
   const run = useCallback(() => {
     if (isRunning || !skill) return;
 
-    dispatch(resultCleared());
-    dispatch(rawEmailsCleared());
+    // Reset the active agent module's state (email: clears result + inbox).
+    const activeModule = getAgentModule(skill.name);
+    activeModule?.reset?.(dispatch);
     dispatch(streamingSet(true));
     setIsRunning(true);
     completedRef.current = false;
@@ -102,14 +96,12 @@ export function useAgentRunner(): UseAgentRunner {
           case 'context':
             dispatch(contextUpdated(event.snapshot));
             break;
-          case 'inbox_fetched':
-            dispatch(inboxFetched(event.payload));
-            break;
-          case 'result':
-            dispatch(resultReceived(event.result));
-            break;
           case 'done':
             finish();
+            break;
+          default:
+            // Domain-specific frames (email: inbox_fetched, result) → active module.
+            activeModule?.ingest(dispatch, event);
             break;
         }
       },

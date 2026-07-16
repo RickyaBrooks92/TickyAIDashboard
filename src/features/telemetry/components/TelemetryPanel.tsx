@@ -1,100 +1,108 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { useAppSelector } from '../../../app/hooks';
-import { EmptyState } from '../../../components/ui/EmptyState';
-import { LayersIcon } from '../../../components/ui/icons';
+import type { RootState } from '../../../app/store';
 import { cx } from '../../../lib/cx';
-import { AgentResultCanvas } from '../../results/components/AgentResultCanvas';
-import { InboxPreviewWidget } from '../../results/components/InboxPreviewWidget';
-import { selectActiveResult, selectIsStreaming, selectRawEmails } from '../telemetrySlice';
+import { ResultsHost } from '../../agents/components/ResultsHost';
+import { useActiveModule } from '../../agents/useActiveModule';
 import { CurrentContextWindow } from './CurrentContextWindow';
 import { ExecutionLog } from './ExecutionLog';
 
-type RightPaneTab = 'telemetry' | 'raw' | 'results';
+interface PaneTab {
+  id: string;
+  label: string;
+  body: ReactNode;
+  /** Fresh-content predicate (drives the dot + auto-switch). Omit for Telemetry. */
+  hasContent?: (state: RootState) => boolean;
+  /** Telemetry lays itself out; other tabs get a scroll container. */
+  scroll: boolean;
+}
 
-/** Right pane: tabbed view over raw Telemetry, the fetched inbox, and the AI verdict. */
+/**
+ * Right pane: a Telemetry tab plus whatever tabs the active agent module
+ * contributes (email → Raw Data) and a generic Results tab. The panel itself
+ * knows nothing about any specific agent.
+ */
 export function TelemetryPanel() {
-  const activeResult = useAppSelector(selectActiveResult);
-  const rawEmails = useAppSelector(selectRawEmails);
-  const isStreaming = useAppSelector(selectIsStreaming);
-  const [tab, setTab] = useState<RightPaneTab>('telemetry');
+  const module = useActiveModule();
+  const [tab, setTab] = useState<string>('telemetry');
 
-  const hasRaw = Boolean(rawEmails && rawEmails.length > 0);
-  const hasResult = Boolean(activeResult);
+  const tabs: PaneTab[] = [
+    {
+      id: 'telemetry',
+      label: 'Telemetry',
+      body: (
+        <>
+          <CurrentContextWindow />
+          <ExecutionLog />
+        </>
+      ),
+      scroll: false,
+    },
+    ...(module?.tabs ?? []).map((t) => ({
+      id: t.id,
+      label: t.label,
+      body: <t.View />,
+      hasContent: t.hasContent,
+      scroll: true,
+    })),
+    ...(module
+      ? [
+          {
+            id: 'results',
+            label: 'Results',
+            body: <ResultsHost />,
+            hasContent: module.hasResult,
+            scroll: true,
+          },
+        ]
+      : []),
+  ];
 
-  // Progression: jump to Raw Data when the inbox lands, then to Results when the
-  // AI verdict arrives. The truthy guards keep a null-reset (start of a new run)
-  // from yanking the user off a tab they switched to manually.
+  // Auto-switch: to the first module tab when its content lands, then to Results
+  // when the verdict arrives (generic form of the old inbox → results flow).
+  const firstModuleTabId = module?.tabs?.[0]?.id;
+  const firstTabReady = useAppSelector((s) =>
+    module?.tabs?.[0] ? module.tabs[0].hasContent(s) : false,
+  );
+  const resultReady = useAppSelector((s) => module?.hasResult(s) ?? false);
+
   useEffect(() => {
-    if (rawEmails) setTab('raw');
-  }, [rawEmails]);
+    if (firstTabReady && firstModuleTabId) setTab(firstModuleTabId);
+  }, [firstTabReady, firstModuleTabId]);
   useEffect(() => {
-    if (activeResult) setTab('results');
-  }, [activeResult]);
+    if (resultReady) setTab('results');
+  }, [resultReady]);
+
+  const activeTab = tabs.find((t) => t.id === tab) ?? tabs[0];
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col bg-zinc-950">
       <div className="flex h-10 shrink-0 items-center gap-1 border-b border-zinc-800 bg-zinc-900 px-2">
-        <TabButton active={tab === 'telemetry'} onClick={() => setTab('telemetry')}>
-          Telemetry
-        </TabButton>
-        <TabButton active={tab === 'raw'} onClick={() => setTab('raw')}>
-          Raw Data
-          {hasRaw && <ReadyDot />}
-        </TabButton>
-        <TabButton active={tab === 'results'} onClick={() => setTab('results')}>
-          Results
-          {hasResult && <ReadyDot />}
-        </TabButton>
+        {tabs.map((t) => (
+          <TabButton key={t.id} tab={t} active={activeTab?.id === t.id} onClick={() => setTab(t.id)} />
+        ))}
       </div>
 
-      {tab === 'telemetry' && (
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          <CurrentContextWindow />
-          <ExecutionLog />
-        </div>
-      )}
-
-      {tab === 'raw' && (
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-          {hasRaw ? (
-            <InboxPreviewWidget />
-          ) : (
-            <EmptyState
-              icon={<LayersIcon size={26} />}
-              title={isStreaming ? 'Fetching your inbox…' : 'No inbox loaded'}
-              hint={
-                isStreaming
-                  ? 'Raw emails will appear here as soon as they load.'
-                  : 'Run an agent to fetch your unread inbox.'
-              }
-            />
-          )}
-        </div>
-      )}
-
-      {tab === 'results' && (
-        <div className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-          <AgentResultCanvas />
-        </div>
-      )}
+      <div
+        className={cx(
+          'min-h-0 min-w-0 flex-1',
+          activeTab?.scroll ? 'overflow-y-auto' : 'flex flex-col',
+        )}
+      >
+        {activeTab?.body}
+      </div>
     </div>
   );
 }
 
-/** Small emerald dot signalling a tab has fresh content. */
-function ReadyDot() {
-  return (
-    <span className="ml-1.5 h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
-  );
-}
-
 interface TabButtonProps {
+  tab: PaneTab;
   active: boolean;
   onClick: () => void;
-  children: ReactNode;
 }
 
-function TabButton({ active, onClick, children }: TabButtonProps) {
+function TabButton({ tab, active, onClick }: TabButtonProps) {
+  const ready = useAppSelector((s) => tab.hasContent?.(s) ?? false);
   return (
     <button
       type="button"
@@ -106,7 +114,10 @@ function TabButton({ active, onClick, children }: TabButtonProps) {
           : 'text-zinc-400 hover:bg-zinc-800/60 hover:text-zinc-200',
       )}
     >
-      {children}
+      {tab.label}
+      {ready && (
+        <span className="ml-1.5 h-1.5 w-1.5 rounded-full bg-emerald-400" aria-hidden="true" />
+      )}
     </button>
   );
 }
