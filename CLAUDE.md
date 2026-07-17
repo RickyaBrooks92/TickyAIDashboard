@@ -53,6 +53,7 @@ No shell edits needed.
 
 - `server.ts` — routes. `auth.ts` — Google OAuth. `gmail.ts` — fetch unread / trash / message body. `ai.ts` — Gemini categorization (with retry, see below). `agentRunner.ts` — orchestrates a run and streams frames. `agentStream.ts` — the SSE contract. `tokenStore.ts` — OAuth refresh token persistence.
 - Endpoints: `POST /api/agent/run` (SSE) · `GET /api/agent/message/:id` · `POST /api/agent/trash` · `GET /api/auth/status` · `POST /api/auth/disconnect` · `/api/auth/google[/callback]`.
+- **The email agent's prompt = the editable SKILL.md body + a fixed output contract.** `buildPrompt` (`server/ai.ts`) leads with the skill's instructions — sent live from the editor as `skillContent` (frontmatter stripped) — then appends the JSON output contract, so editing SKILL.md steers behavior while the schema keeps structured output valid. Skill edits persist to localStorage (`src/features/skills/persistence.ts`).
 - **Gemini calls auto-retry** on transient overload (503 / 429 / 500) with exponential backoff (`server/ai.ts`); each retry is surfaced to the SSE log so the UI shows "Gemini is busy — retrying…" instead of freezing.
 - **SSE robustness gotcha:** stream liveness is tracked via `res.on('close')`, NOT `req.on('close')` — the request `close` fires spuriously once Express consumes the POST body and would drop every frame after the first.
 
