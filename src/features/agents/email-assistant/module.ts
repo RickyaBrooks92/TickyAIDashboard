@@ -11,6 +11,7 @@ import {
 import { EmailDetailView } from './components/EmailDetailView';
 import { EmailResultView } from './components/EmailResultView';
 import { InboxPreviewWidget } from './components/InboxPreviewWidget';
+import type { EmailResultPayload, ParsedEmail } from './types';
 
 /**
  * The email-assistant agent module. Everything email-specific — the inbox tab,
@@ -36,7 +37,10 @@ export const emailAssistantModule: AgentModule = {
     dispatch(rawEmailsCleared());
   },
   ingest: (dispatch, event) => {
-    if (event.type === 'inbox_fetched') dispatch(inboxFetched(event.payload));
-    else if (event.type === 'result') dispatch(resultReceived(event.result));
+    if (event.type === 'data' && event.key === 'inbox') {
+      dispatch(inboxFetched(event.payload as ParsedEmail[]));
+    } else if (event.type === 'result') {
+      dispatch(resultReceived(event.payload as EmailResultPayload));
+    }
   },
 };

@@ -1,7 +1,15 @@
 import { google, type gmail_v1 } from 'googleapis';
-import type { ParsedEmail } from './agentStream.ts';
 import { getOAuthClient } from './auth.ts';
 import { getRefreshToken } from './tokenStore.ts';
+
+/** A raw email fetched from Gmail (headers + plain-text snippet). */
+export interface ParsedEmail {
+  id: string;
+  from: string;
+  subject: string;
+  date: string;
+  snippet: string;
+}
 
 /** Gmail returns at most 500 messages per list page. */
 export const MAX_EMAILS_CAP = 500;

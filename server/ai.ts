@@ -1,10 +1,21 @@
 import { GoogleGenAI, Type } from '@google/genai';
-import type {
-  CleanupPriority,
-  EmailResultPayload,
-  FlaggedEmail,
-  ParsedEmail,
-} from './agentStream.ts';
+import type { ParsedEmail } from './gmail.ts';
+
+/** How safe an email is to delete — drives the color-coded Results grouping. */
+export type CleanupPriority = 'high' | 'medium' | 'low';
+
+export interface FlaggedEmail {
+  id: string;
+  sender: string;
+  subject: string;
+  reason: string;
+  priority: CleanupPriority;
+}
+
+export interface EmailResultPayload {
+  summary: string;
+  flaggedForDeletion: FlaggedEmail[];
+}
 
 const PRIORITIES: readonly CleanupPriority[] = ['high', 'medium', 'low'];
 

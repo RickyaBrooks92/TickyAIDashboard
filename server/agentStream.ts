@@ -38,37 +38,17 @@ export interface ContextWindowSnapshot {
   updatedAt: number;
 }
 
-/** How safe an email is to delete — drives the color-coded Results grouping. */
-export type CleanupPriority = 'high' | 'medium' | 'low';
-
-export interface FlaggedEmail {
-  id: string;
-  sender: string;
-  subject: string;
-  reason: string;
-  priority: CleanupPriority;
-}
-
-export interface EmailResultPayload {
-  summary: string;
-  flaggedForDeletion: FlaggedEmail[];
-}
-
-/** A raw unread email fetched from Gmail (headers + plain-text snippet). */
-export interface ParsedEmail {
-  id: string;
-  from: string;
-  subject: string;
-  date: string;
-  snippet: string;
-}
-
-/** One SSE frame. Kept identical to the frontend's `AgentStreamEvent`. */
+/**
+ * One SSE frame. Generic across agents: `data` carries agent-specific domain data
+ * (the email agent uses key "inbox"), `result` carries the agent's structured
+ * result. Each agent module validates the `unknown` payloads it cares about.
+ * Kept identical to the frontend's `AgentStreamEvent`.
+ */
 export type AgentStreamEvent =
   | { type: 'log'; entry: ExecutionLogEntry }
   | { type: 'context'; snapshot: ContextWindowSnapshot }
-  | { type: 'inbox_fetched'; payload: ParsedEmail[] }
-  | { type: 'result'; result: EmailResultPayload }
+  | { type: 'data'; key: string; payload: unknown }
+  | { type: 'result'; payload: unknown }
   | { type: 'done' };
 
 /** Body of POST /api/agent/run (mirrors the frontend request). */
@@ -80,6 +60,21 @@ export interface AgentRunRequest {
   /** The skill's editable instructions (SKILL.md body), sent live from the editor. */
   skillContent?: string;
 }
+
+/** Validated inputs every agent runner receives to execute one run. */
+export interface AgentRunContext {
+  userId: string;
+  apiKey: string;
+  model: string;
+  maxEmails: number;
+  skillContent: string;
+}
+
+/** An agent runner: fetch + reason + stream frames. Never throws to the caller. */
+export type AgentRunner = (
+  send: (event: AgentStreamEvent) => void,
+  ctx: AgentRunContext,
+) => Promise<void>;
 
 export const MAX_CONTEXT_TOKENS = 200_000;
 

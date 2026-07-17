@@ -25,8 +25,4 @@ export type {
   ContextBlock,
   LogLevel,
   ExecutionEventType,
-  EmailResultPayload,
-  FlaggedEmail,
-  CleanupPriority,
-  ParsedEmail,
 } from './types';

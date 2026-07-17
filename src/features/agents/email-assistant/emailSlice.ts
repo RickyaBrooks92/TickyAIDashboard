@@ -1,6 +1,6 @@
 import { createSlice, type PayloadAction } from '@reduxjs/toolkit';
 import type { RootState } from '../../../app/store';
-import type { EmailResultPayload, ParsedEmail } from '../../telemetry/types';
+import type { EmailResultPayload, ParsedEmail } from './types';
 
 /** State owned by the email-assistant agent: fetched inbox, verdict, open reader. */
 export interface EmailState {

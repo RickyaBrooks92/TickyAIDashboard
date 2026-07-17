@@ -1,10 +1,8 @@
-import type { AgentStreamEvent, ContextBlock, ParsedEmail } from './agentStream.ts';
+import type { AgentRunner, ContextBlock } from './agentStream.ts';
 import { estimateTokens, logEvent, snapshot } from './agentStream.ts';
 import { categorizeInbox } from './ai.ts';
-import { fetchUnreadEmails } from './gmail.ts';
+import { fetchUnreadEmails, type ParsedEmail } from './gmail.ts';
 import { getRefreshToken } from './tokenStore.ts';
-
-type Send = (event: AgentStreamEvent) => void;
 
 function inboxContext(emails: ParsedEmail[]): ContextBlock[] {
   const inboxText = emails.map((e) => `${e.from} ${e.subject} ${e.snippet}`).join('\n');
@@ -31,18 +29,12 @@ function inboxContext(emails: ParsedEmail[]): ContextBlock[] {
 }
 
 /**
- * Run the real email agent: authenticate, fetch unread Gmail, categorize with
- * Gemini, and stream logs + context + the final result over `send`. Any failure
- * is streamed as an error log followed by `done` — never thrown to the caller.
+ * Run the email agent: authenticate, fetch unread Gmail, categorize with Gemini,
+ * and stream logs + context + the final result over `send`. Any failure is
+ * streamed as an error log followed by `done` — never thrown to the caller.
  */
-export async function runEmailAgent(
-  send: Send,
-  userId: string,
-  apiKey: string,
-  model: string,
-  maxEmails: number,
-  skillContent: string,
-): Promise<void> {
+export const runEmailAgent: AgentRunner = async (send, ctx) => {
+  const { userId, apiKey, model, maxEmails, skillContent } = ctx;
   try {
     send(logEvent('info', 'system', 'Authenticating with Google Workspace...'));
 
@@ -58,7 +50,7 @@ export async function runEmailAgent(
     const emails = await fetchUnreadEmails(userId, maxEmails);
 
     // Surface the raw inbox to the UI immediately, before Gemini processing.
-    send({ type: 'inbox_fetched', payload: emails });
+    send({ type: 'data', key: 'inbox', payload: emails });
 
     const baseBlocks = inboxContext(emails);
     send({ type: 'context', snapshot: snapshot(baseBlocks) });
@@ -73,7 +65,7 @@ export async function runEmailAgent(
     if (emails.length === 0) {
       send({
         type: 'result',
-        result: { summary: 'No unread emails to review — your inbox is clear.', flaggedForDeletion: [] },
+        payload: { summary: 'No unread emails to review — your inbox is clear.', flaggedForDeletion: [] },
       });
       send(logEvent('success', 'model_response', 'Nothing to do — no unread mail.'));
       send({ type: 'done' });
@@ -99,7 +91,7 @@ export async function runEmailAgent(
     send({ type: 'context', snapshot: snapshot([...baseBlocks, geminiBlock]) });
 
     send(logEvent('action', 'tool_result', 'AI processing complete. Preparing payload...'));
-    send({ type: 'result', result });
+    send({ type: 'result', payload: result });
     send(
       logEvent(
         'success',
@@ -119,4 +111,4 @@ export async function runEmailAgent(
     send(logEvent('error', 'system', message));
     send({ type: 'done' });
   }
-}
+};

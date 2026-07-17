@@ -1,7 +1,7 @@
 import cors from 'cors';
 import 'dotenv/config';
 import express from 'express';
-import { runEmailAgent } from './agentRunner.ts';
+import { getAgentRunner } from './agents.ts';
 import { logEvent, type AgentRunRequest, type AgentStreamEvent } from './agentStream.ts';
 import { authRouter, isGoogleConfigured } from './auth.ts';
 import {
@@ -97,8 +97,18 @@ app.post('/api/agent/run', async (req, res) => {
   // The skill's editable instructions (SKILL.md body) steer the agent's behavior.
   const skillContent = typeof body?.skillContent === 'string' ? body.skillContent : '';
 
+  // Dispatch to the runner registered for the requested skill/agent id.
+  const skillId = typeof body?.skill === 'string' ? body.skill : '';
+  const runner = getAgentRunner(skillId);
+  if (!runner) {
+    send(logEvent('error', 'system', `No agent is registered for "${skillId || 'unknown skill'}".`));
+    send({ type: 'done' });
+    res.end();
+    return;
+  }
+
   try {
-    await runEmailAgent(send, 'user_1', apiKey, model, maxEmails, skillContent);
+    await runner(send, { userId: 'user_1', apiKey, model, maxEmails, skillContent });
   } catch (err) {
     // runEmailAgent handles its own errors; this guards against anything unexpected.
     console.error('[server] /api/agent/run crashed:', err);

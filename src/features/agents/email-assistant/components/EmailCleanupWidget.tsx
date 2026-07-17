@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useAppDispatch, useAppSelector } from '../../../../app/hooks';
 import { Badge, type BadgeTone } from '../../../../components/ui/Badge';
 import { emailOpened, selectRawEmails } from '../emailSlice';
-import type { CleanupPriority, EmailResultPayload, FlaggedEmail } from '../../../telemetry/types';
+import type { CleanupPriority, EmailResultPayload, FlaggedEmail } from '../types';
 import { trashEmails } from '../api';
 import { FlaggedEmailRow, type RowStatus } from './FlaggedEmailRow';
 
