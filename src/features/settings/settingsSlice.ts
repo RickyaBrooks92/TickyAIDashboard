@@ -7,6 +7,9 @@ export const MAX_EMAILS_MIN = 1;
 export const MAX_EMAILS_MAX = 500;
 export const DEFAULT_MAX_EMAILS = 250;
 
+/** Preset pull sizes offered in the UI. */
+export const MAX_EMAILS_OPTIONS: readonly number[] = [25, 50, 100, 250, 500];
+
 /** User-provided settings + connection status. */
 export interface SettingsState {
   aiProviderKey: string | null;
