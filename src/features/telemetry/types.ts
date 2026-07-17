@@ -82,6 +82,8 @@ export type AgentStreamEvent =
 export interface AgentRunRequest {
   skill?: string;
   model?: string;
+  /** How many unread emails to pull (email agent). Server clamps to [1, 500]. */
+  maxEmails?: number;
 }
 
 /**

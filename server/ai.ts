@@ -98,25 +98,56 @@ function parseResult(text: string): EmailResultPayload {
   return { summary: o.summary, flaggedForDeletion };
 }
 
+/** Called before each backoff sleep so the caller can surface a "retrying" log. */
+export type OnRetry = (attempt: number, delayMs: number) => void;
+
+const MAX_ATTEMPTS = 4;
+
+/** True for transient Gemini failures worth retrying (overload / rate spikes). */
+function isRetryable(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return /503|429|500|UNAVAILABLE|RESOURCE_EXHAUSTED|overloaded|high demand/i.test(msg);
+}
+
+/** Retry `fn` with exponential backoff (~0.5s, 1s, 2s + jitter) on transient errors. */
+async function withRetry<T>(fn: () => Promise<T>, onRetry?: OnRetry): Promise<T> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (attempt >= MAX_ATTEMPTS || !isRetryable(err)) throw err;
+      const delayMs = 500 * 2 ** (attempt - 1) + Math.floor(Math.random() * 250);
+      console.warn(`[ai] Gemini call failed (attempt ${attempt}/${MAX_ATTEMPTS}); retrying in ${delayMs}ms`);
+      onRetry?.(attempt, delayMs);
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+}
+
 /**
  * Send parsed emails to Gemini using the caller-supplied API key (BYOK) and
  * return a structured cleanup result. The client is built per call — no key is
- * held on the server.
+ * held on the server. Transient overload (503/429/500) is retried with backoff.
  */
 export async function categorizeInbox(
   emails: ParsedEmail[],
   apiKey: string,
   model: string,
+  onRetry?: OnRetry,
 ): Promise<EmailResultPayload> {
   const ai = new GoogleGenAI({ apiKey });
-  const response = await ai.models.generateContent({
-    model,
-    contents: buildPrompt(emails),
-    config: {
-      responseMimeType: 'application/json',
-      responseSchema,
-    },
-  });
+  const response = await withRetry(
+    () =>
+      ai.models.generateContent({
+        model,
+        contents: buildPrompt(emails),
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema,
+        },
+      }),
+    onRetry,
+  );
 
   const text = response.text;
   if (!text) throw new Error('Gemini returned an empty response.');

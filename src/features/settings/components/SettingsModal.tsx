@@ -4,8 +4,10 @@ import { cx } from '../../../lib/cx';
 import {
   aiProviderKeyCleared,
   aiProviderKeySet,
+  maxEmailsSet,
   modelSelected,
   selectAiProviderKey,
+  selectMaxEmails,
   selectSelectedModel,
 } from '../settingsSlice';
 
@@ -20,10 +22,14 @@ const MODEL_OPTIONS: ReadonlyArray<{ value: string; label: string }> = [
   { value: 'gemini-flash-latest', label: 'confirmed working' },
 ];
 
+/** Preset pull sizes for the "Emails per run" control. */
+const MAX_EMAILS_OPTIONS: readonly number[] = [25, 50, 100, 250, 500];
+
 export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
   const dispatch = useAppDispatch();
   const currentKey = useAppSelector(selectAiProviderKey);
   const selectedModel = useAppSelector(selectSelectedModel);
+  const maxEmails = useAppSelector(selectMaxEmails);
   const [draft, setDraft] = useState('');
   const [reveal, setReveal] = useState(false);
 
@@ -109,6 +115,29 @@ export function SettingsModal({ isOpen, onClose }: SettingsModalProps) {
                 </option>
               ))}
             </datalist>
+          </div>
+
+          {/* Emails per run */}
+          <div>
+            <label htmlFor="max-emails" className="text-xs font-medium text-zinc-300">
+              Emails per run
+            </label>
+            <p className="mt-0.5 text-[11px] leading-relaxed text-zinc-500">
+              How many unread emails to fetch and analyze each run. Larger pulls take a
+              little longer and use more of the model&apos;s output budget.
+            </p>
+            <select
+              id="max-emails"
+              value={maxEmails}
+              onChange={(e) => dispatch(maxEmailsSet(Number(e.target.value)))}
+              className="mt-2 w-full rounded-md border border-zinc-700 bg-zinc-950 px-2.5 py-1.5 text-xs text-zinc-100 outline-none focus:border-violet-500"
+            >
+              {MAX_EMAILS_OPTIONS.map((n) => (
+                <option key={n} value={n}>
+                  {n} emails
+                </option>
+              ))}
+            </select>
           </div>
 
           {/* API key */}

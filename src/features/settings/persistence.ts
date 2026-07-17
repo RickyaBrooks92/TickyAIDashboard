@@ -17,6 +17,7 @@ const STORAGE_KEY = 'tickys.settings.v1';
 export interface PersistedSettings {
   aiProviderKey: string | null;
   selectedModel: string;
+  maxEmails: number;
 }
 
 /**
@@ -38,6 +39,9 @@ export function loadPersistedSettings(): Partial<PersistedSettings> {
     }
     if (typeof record.selectedModel === 'string' && record.selectedModel.length > 0) {
       out.selectedModel = record.selectedModel;
+    }
+    if (typeof record.maxEmails === 'number' && Number.isFinite(record.maxEmails)) {
+      out.maxEmails = Math.min(500, Math.max(1, Math.floor(record.maxEmails)));
     }
     return out;
   } catch {

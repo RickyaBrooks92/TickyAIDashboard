@@ -3,7 +3,15 @@ import type { ParsedEmail } from './agentStream.ts';
 import { getOAuthClient } from './auth.ts';
 import { getRefreshToken } from './tokenStore.ts';
 
-const MAX_EMAILS = 15;
+/** Gmail returns at most 500 messages per list page. */
+export const MAX_EMAILS_CAP = 500;
+/** Default pull size when a run doesn't specify one. */
+export const DEFAULT_MAX_EMAILS = 250;
+
+// Gmail metadata reads are N+1 (one messages.get per message). Cap how many run
+// at once so a large pull stays under Gmail's per-user rate limit (~250 quota
+// units/sec; each get ≈ 5 units). ~10 in flight keeps us comfortably under it.
+const FETCH_CONCURRENCY = 10;
 
 type GmailHeader = { name?: string | null; value?: string | null };
 
@@ -26,38 +34,66 @@ function getGmailClient(userId: string) {
   return google.gmail({ version: 'v1', auth: client });
 }
 
+/** Run `fn` over `items` with at most `limit` promises in flight at a time. */
+async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = [];
+  for (let i = 0; i < items.length; i += limit) {
+    const batch = items.slice(i, i + limit);
+    results.push(...(await Promise.all(batch.map(fn))));
+  }
+  return results;
+}
+
 /**
  * Fetch the user's most recent unread emails (headers + plain-text snippet).
- * Throws a clear error if the account isn't connected or OAuth is unconfigured.
+ * Metadata reads are throttled (see FETCH_CONCURRENCY) so a large pull stays
+ * under Gmail's rate limit, and a single failed message is skipped rather than
+ * failing the whole batch. Throws only if the account isn't connected / OAuth
+ * is unconfigured.
  */
-export async function fetchUnreadEmails(userId: string): Promise<ParsedEmail[]> {
+export async function fetchUnreadEmails(
+  userId: string,
+  maxEmails: number = DEFAULT_MAX_EMAILS,
+): Promise<ParsedEmail[]> {
   const gmail = getGmailClient(userId);
 
   const list = await gmail.users.messages.list({
     userId: 'me',
     q: 'is:unread',
-    maxResults: MAX_EMAILS,
+    maxResults: maxEmails, // caller clamps to [1, MAX_EMAILS_CAP]; one page, no paging.
   });
   const messages = list.data.messages ?? [];
 
-  const emails = await Promise.all(
-    messages.map(async (msg): Promise<ParsedEmail | null> => {
+  const emails = await mapWithConcurrency(
+    messages,
+    FETCH_CONCURRENCY,
+    async (msg): Promise<ParsedEmail | null> => {
       if (!msg.id) return null;
-      const detail = await gmail.users.messages.get({
-        userId: 'me',
-        id: msg.id,
-        format: 'metadata',
-        metadataHeaders: ['From', 'Subject', 'Date'],
-      });
-      const headers = detail.data.payload?.headers ?? undefined;
-      return {
-        id: msg.id,
-        from: header(headers, 'From'),
-        subject: header(headers, 'Subject'),
-        date: header(headers, 'Date'),
-        snippet: detail.data.snippet ?? '',
-      };
-    }),
+      try {
+        const detail = await gmail.users.messages.get({
+          userId: 'me',
+          id: msg.id,
+          format: 'metadata',
+          metadataHeaders: ['From', 'Subject', 'Date'],
+        });
+        const headers = detail.data.payload?.headers ?? undefined;
+        return {
+          id: msg.id,
+          from: header(headers, 'From'),
+          subject: header(headers, 'Subject'),
+          date: header(headers, 'Date'),
+          snippet: detail.data.snippet ?? '',
+        };
+      } catch (err) {
+        // Skip a message that failed to load (deleted mid-fetch / transient error).
+        console.warn(`[gmail] skipped message ${msg.id}:`, err instanceof Error ? err.message : err);
+        return null;
+      }
+    },
   );
 
   return emails.filter((email): email is ParsedEmail => email !== null);

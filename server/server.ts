@@ -4,7 +4,12 @@ import express from 'express';
 import { runEmailAgent } from './agentRunner.ts';
 import { logEvent, type AgentRunRequest, type AgentStreamEvent } from './agentStream.ts';
 import { authRouter, isGoogleConfigured } from './auth.ts';
-import { fetchMessageBody, trashMessages } from './gmail.ts';
+import {
+  DEFAULT_MAX_EMAILS,
+  MAX_EMAILS_CAP,
+  fetchMessageBody,
+  trashMessages,
+} from './gmail.ts';
 import { clearTokens, getRefreshToken } from './tokenStore.ts';
 
 const PORT = Number(process.env.PORT) || 3001;
@@ -82,8 +87,15 @@ app.post('/api/agent/run', async (req, res) => {
       ? body.model.trim()
       : DEFAULT_MODEL;
 
+  // Clamp the requested pull size to a safe range (Gmail caps a page at 500).
+  const rawMax = body?.maxEmails;
+  const maxEmails =
+    typeof rawMax === 'number' && Number.isFinite(rawMax)
+      ? Math.min(MAX_EMAILS_CAP, Math.max(1, Math.floor(rawMax)))
+      : DEFAULT_MAX_EMAILS;
+
   try {
-    await runEmailAgent(send, 'user_1', apiKey, model);
+    await runEmailAgent(send, 'user_1', apiKey, model, maxEmails);
   } catch (err) {
     // runEmailAgent handles its own errors; this guards against anything unexpected.
     console.error('[server] /api/agent/run crashed:', err);

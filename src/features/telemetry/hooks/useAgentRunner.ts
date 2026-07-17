@@ -1,7 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { fetchEventSource } from '@microsoft/fetch-event-source';
 import { useAppDispatch, useAppSelector } from '../../../app/hooks';
-import { selectAiProviderKey, selectSelectedModel } from '../../settings/settingsSlice';
+import {
+  selectAiProviderKey,
+  selectMaxEmails,
+  selectSelectedModel,
+} from '../../settings/settingsSlice';
 import { selectSelectedSkill } from '../../skills/skillsSlice';
 import { getAgentModule } from '../../agents/registry';
 import { contextUpdated, logAppended, streamingSet } from '../telemetrySlice';
@@ -29,6 +33,7 @@ export function useAgentRunner(): UseAgentRunner {
   const skill = useAppSelector(selectSelectedSkill);
   const apiKey = useAppSelector(selectAiProviderKey);
   const model = useAppSelector(selectSelectedModel);
+  const maxEmails = useAppSelector(selectMaxEmails);
   const [isRunning, setIsRunning] = useState(false);
   const controllerRef = useRef<AbortController | null>(null);
   const completedRef = useRef(false);
@@ -72,7 +77,7 @@ export function useAgentRunner(): UseAgentRunner {
         // helpful error frame in that case).
         'x-ai-provider-key': apiKey ?? '',
       },
-      body: JSON.stringify({ skill: skill.name, model } satisfies AgentRunRequest),
+      body: JSON.stringify({ skill: skill.name, model, maxEmails } satisfies AgentRunRequest),
       signal: controller.signal,
       openWhenHidden: true,
       async onopen(response) {
@@ -129,7 +134,7 @@ export function useAgentRunner(): UseAgentRunner {
       // Real failures are surfaced to the telemetry log in onerror; a normal
       // close rejects with our own 'stream complete' sentinel — ignore both here.
     });
-  }, [apiKey, dispatch, finish, isRunning, model, skill]);
+  }, [apiKey, dispatch, finish, isRunning, maxEmails, model, skill]);
 
   return { isRunning, canRun: Boolean(skill) && !isRunning, run };
 }

@@ -40,6 +40,7 @@ export async function runEmailAgent(
   userId: string,
   apiKey: string,
   model: string,
+  maxEmails: number,
 ): Promise<void> {
   try {
     send(logEvent('info', 'system', 'Authenticating with Google Workspace...'));
@@ -53,7 +54,7 @@ export async function runEmailAgent(
       );
     }
 
-    const emails = await fetchUnreadEmails(userId);
+    const emails = await fetchUnreadEmails(userId, maxEmails);
 
     // Surface the raw inbox to the UI immediately, before Gemini processing.
     send({ type: 'inbox_fetched', payload: emails });
@@ -78,7 +79,15 @@ export async function runEmailAgent(
       return;
     }
 
-    const result = await categorizeInbox(emails, apiKey, model);
+    const result = await categorizeInbox(emails, apiKey, model, (_attempt, delayMs) => {
+      send(
+        logEvent(
+          'warn',
+          'system',
+          `Gemini is busy (high demand) — retrying in ${Math.max(1, Math.round(delayMs / 1000))}s…`,
+        ),
+      );
+    });
 
     const geminiBlock: ContextBlock = {
       id: 'ctx-gemini',
