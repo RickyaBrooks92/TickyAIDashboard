@@ -7,6 +7,7 @@ import {
 import type { RootState } from '../../app/store';
 import type { Skill, SkillContentChange, SkillsExtraState } from './types';
 import { mockSkills } from './mockData';
+import { loadSkillContents } from './persistence';
 
 /** Normalized collection of skills keyed by `id`. */
 const skillsAdapter = createEntityAdapter<Skill>();
@@ -17,7 +18,14 @@ const extraState: SkillsExtraState = {
   error: null,
 };
 
-const initialState = skillsAdapter.getInitialState(extraState, mockSkills);
+// Restore any edited SKILL.md content saved from a previous session.
+const persistedContents = loadSkillContents();
+const seededSkills = mockSkills.map((skill) => {
+  const saved = persistedContents[skill.id];
+  return saved !== undefined ? { ...skill, content: saved } : skill;
+});
+
+const initialState = skillsAdapter.getInitialState(extraState, seededSkills);
 
 const skillsSlice = createSlice({
   name: 'skills',

@@ -77,6 +77,8 @@ export interface AgentRunRequest {
   model?: string;
   /** How many unread emails to pull (email agent). Server clamps to [1, 500]. */
   maxEmails?: number;
+  /** The skill's editable instructions (SKILL.md body), sent live from the editor. */
+  skillContent?: string;
 }
 
 export const MAX_CONTEXT_TOKENS = 200_000;

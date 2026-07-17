@@ -2,6 +2,7 @@ import { configureStore } from '@reduxjs/toolkit';
 import emailReducer from '../features/agents/email-assistant/emailSlice';
 import { settingsListenerMiddleware } from '../features/settings/persistenceListener';
 import settingsReducer from '../features/settings/settingsSlice';
+import { skillsListenerMiddleware } from '../features/skills/persistenceListener';
 import skillsReducer from '../features/skills/skillsSlice';
 import telemetryReducer from '../features/telemetry/telemetrySlice';
 
@@ -13,7 +14,10 @@ export const store = configureStore({
     email: emailReducer,
   },
   middleware: (getDefaultMiddleware) =>
-    getDefaultMiddleware().prepend(settingsListenerMiddleware.middleware),
+    getDefaultMiddleware().prepend(
+      settingsListenerMiddleware.middleware,
+      skillsListenerMiddleware.middleware,
+    ),
 });
 
 /** Full state tree — inferred from the store, the single source of truth. */

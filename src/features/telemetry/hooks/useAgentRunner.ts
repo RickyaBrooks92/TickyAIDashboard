@@ -77,7 +77,15 @@ export function useAgentRunner(): UseAgentRunner {
         // helpful error frame in that case).
         'x-ai-provider-key': apiKey ?? '',
       },
-      body: JSON.stringify({ skill: skill.name, model, maxEmails } satisfies AgentRunRequest),
+      body: JSON.stringify(
+        {
+          skill: skill.name,
+          model,
+          maxEmails,
+          // Live editor content — what you see in the editor is what runs.
+          skillContent: skill.content,
+        } satisfies AgentRunRequest,
+      ),
       signal: controller.signal,
       openWhenHidden: true,
       async onopen(response) {

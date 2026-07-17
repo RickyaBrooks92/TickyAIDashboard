@@ -41,6 +41,7 @@ export async function runEmailAgent(
   apiKey: string,
   model: string,
   maxEmails: number,
+  skillContent: string,
 ): Promise<void> {
   try {
     send(logEvent('info', 'system', 'Authenticating with Google Workspace...'));
@@ -79,7 +80,7 @@ export async function runEmailAgent(
       return;
     }
 
-    const result = await categorizeInbox(emails, apiKey, model, (_attempt, delayMs) => {
+    const result = await categorizeInbox(emails, apiKey, model, skillContent, (_attempt, delayMs) => {
       send(
         logEvent(
           'warn',

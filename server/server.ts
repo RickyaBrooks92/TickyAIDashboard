@@ -94,8 +94,11 @@ app.post('/api/agent/run', async (req, res) => {
       ? Math.min(MAX_EMAILS_CAP, Math.max(1, Math.floor(rawMax)))
       : DEFAULT_MAX_EMAILS;
 
+  // The skill's editable instructions (SKILL.md body) steer the agent's behavior.
+  const skillContent = typeof body?.skillContent === 'string' ? body.skillContent : '';
+
   try {
-    await runEmailAgent(send, 'user_1', apiKey, model, maxEmails);
+    await runEmailAgent(send, 'user_1', apiKey, model, maxEmails, skillContent);
   } catch (err) {
     // runEmailAgent handles its own errors; this guards against anything unexpected.
     console.error('[server] /api/agent/run crashed:', err);

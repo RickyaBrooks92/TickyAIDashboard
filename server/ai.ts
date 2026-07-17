@@ -33,7 +33,23 @@ const responseSchema = {
   propertyOrdering: ['summary', 'flaggedForDeletion'],
 };
 
-function buildPrompt(emails: ParsedEmail[]): string {
+/** Fallback instructions when the skill body is empty. */
+const DEFAULT_INSTRUCTIONS =
+  'You are an email cleanup assistant. Analyze the unread emails and identify which are safe to delete or archive.';
+
+/** Strip a leading YAML frontmatter block (--- … ---) from a SKILL.md body. */
+function stripFrontmatter(md: string): string {
+  return md.replace(/^﻿?---\r?\n[\s\S]*?\r?\n---\r?\n?/, '').trim();
+}
+
+/**
+ * Build the Gemini prompt: the skill's own instructions (from the editable
+ * SKILL.md body) lead, followed by the fixed output contract (which must match
+ * the JSON schema) and the email payload. The skill text steers behavior; the
+ * contract keeps the structured output valid regardless of what the user writes.
+ */
+function buildPrompt(emails: ParsedEmail[], skillContent: string): string {
+  const instructions = stripFrontmatter(skillContent) || DEFAULT_INSTRUCTIONS;
   const inbox = emails.map((e) => ({
     id: e.id,
     from: e.from,
@@ -41,18 +57,17 @@ function buildPrompt(emails: ParsedEmail[]): string {
     snippet: e.snippet,
   }));
   return [
-    'You are an email cleanup assistant. Analyze these unread emails and return JSON only.',
+    instructions,
     '',
-    'Tasks:',
-    '1. Write a one-to-two sentence executive "summary" of what needs the user\'s attention.',
-    '2. In "flaggedForDeletion", include ONLY promotional, marketing, newsletter, or low-priority',
-    '   automated emails that are safe to delete or archive. Never flag personal or important mail.',
-    '   For each flagged email set "id" to the exact input id, copy its "sender" (the from field) and',
-    '   "subject", give a short "reason" (e.g. "Promotional", "Low-priority automated alert"), and',
-    '   set "priority" by how safe it is to delete:',
-    '     - "high": spam, junk, or obvious clutter that is clearly safe to delete',
-    '     - "medium": promotional or marketing email (sales, product news, newsletters)',
-    '     - "low": automated notifications, receipts, or social updates worth a glance first',
+    'Return JSON only, matching the provided schema:',
+    '- "summary": a one-to-two sentence executive summary of what needs the user\'s attention.',
+    '- "flaggedForDeletion": include ONLY promotional, marketing, newsletter, or low-priority',
+    '  automated emails that are safe to delete or archive. Never flag personal or important mail.',
+    '  For each, set "id" to the exact input id, copy its "sender" (the from field) and "subject",',
+    '  give a short "reason", and set "priority" by how safe it is to delete:',
+    '    - "high": spam, junk, or obvious clutter that is clearly safe to delete',
+    '    - "medium": promotional or marketing email (sales, product news, newsletters)',
+    '    - "low": automated notifications, receipts, or social updates worth a glance first',
     '',
     `Unread emails (JSON):\n${JSON.stringify(inbox, null, 2)}`,
   ].join('\n');
@@ -133,6 +148,7 @@ export async function categorizeInbox(
   emails: ParsedEmail[],
   apiKey: string,
   model: string,
+  skillContent: string,
   onRetry?: OnRetry,
 ): Promise<EmailResultPayload> {
   const ai = new GoogleGenAI({ apiKey });
@@ -140,7 +156,7 @@ export async function categorizeInbox(
     () =>
       ai.models.generateContent({
         model,
-        contents: buildPrompt(emails),
+        contents: buildPrompt(emails, skillContent),
         config: {
           responseMimeType: 'application/json',
           responseSchema,
