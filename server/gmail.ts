@@ -57,21 +57,22 @@ async function mapWithConcurrency<T, R>(
 }
 
 /**
- * Fetch the user's most recent unread emails (headers + plain-text snippet).
+ * Fetch emails matching a Gmail search query (headers + plain-text snippet).
  * Metadata reads are throttled (see FETCH_CONCURRENCY) so a large pull stays
  * under Gmail's rate limit, and a single failed message is skipped rather than
  * failing the whole batch. Throws only if the account isn't connected / OAuth
  * is unconfigured.
  */
-export async function fetchUnreadEmails(
+export async function fetchEmails(
   userId: string,
+  query: string,
   maxEmails: number = DEFAULT_MAX_EMAILS,
 ): Promise<ParsedEmail[]> {
   const gmail = getGmailClient(userId);
 
   const list = await gmail.users.messages.list({
     userId: 'me',
-    q: 'is:unread',
+    q: query,
     maxResults: maxEmails, // caller clamps to [1, MAX_EMAILS_CAP]; one page, no paging.
   });
   const messages = list.data.messages ?? [];
@@ -105,6 +106,14 @@ export async function fetchUnreadEmails(
   );
 
   return emails.filter((email): email is ParsedEmail => email !== null);
+}
+
+/** Fetch the user's most recent unread emails. */
+export function fetchUnreadEmails(
+  userId: string,
+  maxEmails: number = DEFAULT_MAX_EMAILS,
+): Promise<ParsedEmail[]> {
+  return fetchEmails(userId, 'is:unread', maxEmails);
 }
 
 /** Decode a Gmail base64url body part into a UTF-8 string. */

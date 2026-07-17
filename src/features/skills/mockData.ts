@@ -1,5 +1,6 @@
 import type { Skill } from './types';
 import emailAssistantMd from '../../../skills/email-assistant/SKILL.md?raw';
+import receiptsMd from '../../../skills/receipts-assistant/SKILL.md?raw';
 
 const now = Date.now();
 
@@ -16,5 +17,13 @@ export const mockSkills: Skill[] = [
     isDirty: false,
     lastModifiedAt: now,
     content: emailAssistantMd,
+  },
+  {
+    id: 'skill-receipts-assistant',
+    name: 'receipts-assistant',
+    path: 'skills/receipts-assistant/SKILL.md',
+    isDirty: false,
+    lastModifiedAt: now,
+    content: receiptsMd,
   },
 ];

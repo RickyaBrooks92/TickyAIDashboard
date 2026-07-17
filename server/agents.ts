@@ -1,5 +1,6 @@
 import { runEmailAgent } from './agentRunner.ts';
 import type { AgentRunner } from './agentStream.ts';
+import { runReceiptsAgent } from './receiptsRunner.ts';
 
 /**
  * Backend agent registry: maps a skill/agent id (the SKILL.md `name`, sent as
@@ -8,6 +9,7 @@ import type { AgentRunner } from './agentStream.ts';
  */
 const agentRunners: Record<string, AgentRunner> = {
   'email-assistant': runEmailAgent,
+  'receipts-assistant': runReceiptsAgent,
 };
 
 export function getAgentRunner(id: string): AgentRunner | undefined {
