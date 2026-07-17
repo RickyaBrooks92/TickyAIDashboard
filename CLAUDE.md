@@ -6,7 +6,7 @@ Context for AI coding assistants working in this repo. **Read this first.**
 
 Tickys AI Dashboard — a **local, single-user** observability dashboard that runs a real email-assistant agent over the user's Gmail. Two-pane UI: left = skills explorer + SKILL.md editor (Monaco) / email reader; right = tabbed **Telemetry / Raw Data / Results**. A Node/Express backend streams the agent run over **Server-Sent Events**.
 
-It is architected as a **generic multi-agent shell** — email is the first agent _module_; the shell knows nothing about email.
+It is architected as a **generic multi-agent shell** — **email** and **receipts** are the first two agent _modules_; the shell knows nothing about any specific agent. Selecting a skill in the explorer switches the whole app to that agent.
 
 ## ⚠️ Critical constraints
 
@@ -36,29 +36,29 @@ The shell (run / log / context / editor / tabs) is generic; everything agent-spe
 - `src/features/agents/registry.ts` — `registerAgentModule`, `getAgentModule(id)`, `resetAllAgentModules(dispatch)`.
 - `src/features/agents/useActiveModule.ts` — resolves the module by the selected skill's `name`.
 - `src/features/agents/components/ResultsHost.tsx` — generic Results tab; renders the active module's `ResultView`.
-- **Shell delegation:** the SSE runner (`src/features/telemetry/hooks/useAgentRunner.ts`) dispatches generic frames (`log`/`context`/`done`) and delegates the rest to `activeModule.ingest`; `TelemetryPanel` builds its tabs from the module; `ControlPlane` hands the center pane to `module.DetailView`.
+- **Shell delegation:** the SSE contract is **generic** — `{ type:'data', key, payload }` and `{ type:'result', payload }` with `unknown` payloads. The runner (`src/features/telemetry/hooks/useAgentRunner.ts`) handles `log`/`context`/`done` and delegates `data`/`result` to `activeModule.ingest` (which validates its own payload); `TelemetryPanel` builds tabs from the module; `ControlPlane` hands the center pane to `module.DetailView`.
 
-### The email agent (first module)
+### The agent modules
 
-`src/features/agents/email-assistant/`: `module.ts`, `emailSlice.ts` (Redux state key **`email`**: `rawEmails` / `activeResult` / `selectedEmail`), `api.ts` (`trashEmails` + `fetchEmailBody`), `components/` (cleanup widget, reader, inbox preview, rows).
+- **email-assistant** (`src/features/agents/email-assistant/`): `module.ts`, `emailSlice.ts` (state key **`email`**), `api.ts` (`trashEmails` + `fetchEmailBody`), `components/` (cleanup widget, reader, inbox preview, rows), `types.ts`. Has a Raw Data tab + a center-pane reader (`DetailView`).
+- **receipts-assistant** (`src/features/agents/receipts/`): `module.ts`, `receiptsSlice.ts` (state key **`receipts`**), `components/ReceiptsResultView.tsx` (grouped Subscriptions/Receipts table), `types.ts`. Read-only; no tabs or `DetailView` — proof the shell handles a module that opts out of those.
 
 ### To add a new agent
 
-1. Create `src/features/agents/<name>/` with a `module.ts` (+ optionally a slice, components, api).
-2. Register it in `src/app/registerAgents.ts` — **one line**. Its `id` must match the SKILL.md `name`.
+The `id` must match the SKILL.md `name` on both sides. **No shell edits needed.**
 
-No shell edits needed.
+1. **Frontend:** create `src/features/agents/<name>/` with a `module.ts` (+ slice/components as needed); register it in `src/app/registerAgents.ts` and add its reducer to `src/app/store.ts`. Add `skills/<name>/SKILL.md` + a skill entry in `src/features/skills/mockData.ts`.
+2. **Backend:** write a runner with the `AgentRunner` signature that streams `data`/`result` frames; register it in `server/agents.ts` under the same id.
 
 ## Backend (`server/`, Express 5, ESM, tsx)
 
-- `server.ts` — routes. `auth.ts` — Google OAuth. `gmail.ts` — fetch unread / trash / message body. `ai.ts` — Gemini categorization (with retry, see below). `agentRunner.ts` — orchestrates a run and streams frames. `agentStream.ts` — the SSE contract. `tokenStore.ts` — OAuth refresh token persistence.
+- `server.ts` — routes; `/api/agent/run` dispatches to a runner via the registry. `agents.ts` — **backend agent registry** (skill id → runner). `agentStream.ts` — the **generic** SSE contract + `AgentRunner` type. `gmail.ts` — `fetchEmails(query)` / trash / message body (+ `ParsedEmail`). `retry.ts` — shared Gemini backoff. `ai.ts` + `agentRunner.ts` — email extraction + runner. `receipts.ts` + `receiptsRunner.ts` — receipts extraction + runner. `auth.ts` — OAuth. `tokenStore.ts` — token persistence.
 - Endpoints: `POST /api/agent/run` (SSE) · `GET /api/agent/message/:id` · `POST /api/agent/trash` · `GET /api/auth/status` · `POST /api/auth/disconnect` · `/api/auth/google[/callback]`.
-- **The email agent's prompt = the editable SKILL.md body + a fixed output contract.** `buildPrompt` (`server/ai.ts`) leads with the skill's instructions — sent live from the editor as `skillContent` (frontmatter stripped) — then appends the JSON output contract, so editing SKILL.md steers behavior while the schema keeps structured output valid. Skill edits persist to localStorage (`src/features/skills/persistence.ts`).
-- **Gemini calls auto-retry** on transient overload (503 / 429 / 500) with exponential backoff (`server/ai.ts`); each retry is surfaced to the SSE log so the UI shows "Gemini is busy — retrying…" instead of freezing.
+- **Each agent's prompt = its editable SKILL.md body + a fixed output contract.** `buildPrompt` (in `server/ai.ts` and `server/receipts.ts`) leads with the skill's instructions — sent live from the editor as `skillContent` (frontmatter stripped) — then appends the JSON output contract, so editing SKILL.md steers behavior while the schema keeps structured output valid. Skill edits persist to localStorage (`src/features/skills/persistence.ts`).
+- **Gemini calls auto-retry** on transient overload (503 / 429 / 500) with exponential backoff (`server/retry.ts`, shared by both agents); each retry is surfaced to the SSE log so the UI shows "Gemini is busy — retrying…" instead of freezing.
 - **SSE robustness gotcha:** stream liveness is tracked via `res.on('close')`, NOT `req.on('close')` — the request `close` fires spuriously once Express consumes the POST body and would drop every frame after the first.
 
 ## Known tech debt / deferred
 
-- **The SSE contract is still email-typed.** `AgentStreamEvent` (in both `server/agentStream.ts` and `src/features/telemetry/types.ts`) hardcodes `inbox_fetched` and `result: EmailResultPayload`, and the email payload types (`ParsedEmail`, `EmailResultPayload`, `FlaggedEmail`, `CleanupPriority`) still live in `telemetry/types.ts`. **Phase 3** = generalize to a `{ agentType, payload }` envelope and move those types into the module — do this only when a real second agent lands.
-- **Email-specific run config lives in global settings.** `maxEmails` (emails per run) sits in `settingsSlice` and flows through the generic `AgentRunRequest`, even though it only applies to the email agent — move it behind per-agent run params when the envelope is generalized.
-- **`server/agentStream.ts` and `src/features/telemetry/types.ts` must be kept in sync by hand** (no shared package yet).
+- **Agent run config lives in global settings.** `maxEmails` (emails per run) sits in `settingsSlice` and rides the generic `AgentRunRequest`, and `AgentRunRequest` still has email-ish fields (`maxEmails`, `skillContent`) rather than a per-agent params bag. Fine for now; revisit if an agent needs very different run params.
+- **`server/agentStream.ts` and `src/features/telemetry/types.ts` must be kept in sync by hand** (no shared package yet). Same for per-agent payload types (`.../email-assistant/types.ts` ↔ backend `ai.ts`/`gmail.ts`; `.../receipts/types.ts` ↔ backend `receipts.ts`).
