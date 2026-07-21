@@ -1,8 +1,11 @@
 # Tickys AI Dashboard
 
-A local, single-user observability dashboard that runs a real **email-assistant AI agent** over your Gmail. It streams the agent's execution live, shows the raw fetched inbox, and presents a **color-coded, human-in-the-loop cleanup verdict** you can act on (trash / keep) — plus a built-in reader to open any message in the center pane.
+A local, single-user observability dashboard that runs real **AI agents** over your Gmail. It streams each agent's execution live and presents a **human-in-the-loop result** you can act on. Two agents ship today:
 
-It's built as a **generic multi-agent shell**: the email assistant is the first agent _module_, and adding another agent is "write a module + register it" — no shell changes.
+- **Email cleanup** — categorizes unread mail into color-coded delete-priority tiers (trash / keep), with a built-in reader to open any message in the center pane.
+- **Receipts & Subscriptions** — scans your purchases and extracts a grouped table of receipts and recurring subscriptions (with an estimated monthly total).
+
+It's built as a **generic multi-agent shell**: each agent is a self-contained _module_, and adding another is "write a module + a runner, then register them" — no shell changes. See [CLAUDE.md](./CLAUDE.md) for the architecture and the add-an-agent recipe.
 
 > ⚠️ **Personal / internal tool.** Runs entirely on `localhost`; it is not deployed, hardened, or multi-user. Design choices favor convenience over production hardening.
 
@@ -19,15 +22,17 @@ src/
   components/     layout shell (DashboardLayout, TopBar) + UI primitives
   features/
     agents/       AgentModule contract + registry + generic ResultsHost
-      email-assistant/   the first agent: slice, module, api, components
+      email-assistant/     agent: slice, module, api, components, types
+      receipts/            agent: slice, module, result table, types
     auth/         Google connect / disconnect
     settings/     BYOK Gemini key + model choice (persisted to localStorage)
     skills/       SKILL.md explorer + Monaco editor (ControlPlane / center pane)
     telemetry/    generic run state (log / context / isStreaming) + SSE runner + panel
   lib/            small helpers
-server/           Express SSE backend (see CLAUDE.md for the file map)
+server/           Express SSE backend + agent registry (see CLAUDE.md for the file map)
 skills/
-  email-assistant/SKILL.md   the agent's instructions (app data, shown in the editor)
+  email-assistant/SKILL.md      each agent's editable instructions (shown in the editor)
+  receipts-assistant/SKILL.md
 ```
 
 ## Setup
@@ -59,7 +64,7 @@ npm run dev --prefix server
 npm run dev
 ```
 
-Then open `http://localhost:5173`, click **Connect Google Workspace**, paste your Gemini key in **Settings**, select the **email-assistant** skill, and hit **Run Agent**.
+Then open `http://localhost:5173`, click **Connect Google Workspace**, paste your Gemini key in **Settings**, pick a skill in the explorer (**email-assistant** or **receipts-assistant** — each is its own agent), and hit **Run Agent**.
 
 ## Scripts
 
@@ -73,10 +78,10 @@ Then open `http://localhost:5173`, click **Connect Google Workspace**, paste you
 
 ## How it works
 
-1. The frontend `POST`s to `/api/agent/run` with the BYOK key in the `x-ai-provider-key` header.
-2. The backend fetches unread Gmail (OAuth), sends it to Gemini for categorization, and streams **Server-Sent Events** back: `log`, `context`, `inbox_fetched`, `result`, `done`.
-3. The UI renders the live log, the raw inbox, and a priority-tiered cleanup verdict.
-4. **Human-in-the-loop:** you approve deletions, and `/api/agent/trash` moves those messages to the Gmail trash (recoverable).
+1. The frontend `POST`s to `/api/agent/run` (BYOK key in the `x-ai-provider-key` header, plus the selected skill).
+2. The backend dispatches to the runner registered for that skill, fetches the relevant Gmail (OAuth), sends it to Gemini, and streams **generic Server-Sent Events** back: `log`, `context`, `data`, `result`, `done`. Each agent module validates the payloads it cares about.
+3. The UI renders the live log and the agent's structured result (email → a priority-tiered cleanup verdict; receipts → a subscriptions/receipts table).
+4. **Human-in-the-loop:** for the email agent, you approve deletions and `/api/agent/trash` moves those messages to the Gmail trash (recoverable).
 
 ## For contributors & AI assistants
 
